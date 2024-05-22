@@ -1,12 +1,11 @@
 // ==UserScript==
 // @name                Youtube Downloader
-// @version             1.0.2
-// @description         Add video download button in combo menu
+// @version             1.0.3
+// @description         Add video download button in combo menu.
 // @author              FawayTT
 // @namespace           FawayTT
 // @icon                https://i.imgur.com/D57wQrY.png
-// @homepage            https://github.com/FawayTT/userscripts
-// @match               https://www.youtube.com/watch*
+// @match               https://www.youtube.com/*
 // @grant               none
 // @license             MIT
 // ==/UserScript==
@@ -14,9 +13,10 @@
 (function () {
   let timeout;
   let replaced = false;
+  let oldHref = document.location.href;
 
-  function addButton() {
-    if (document.location.href.includes('playlist') || document.getElementsByTagName('custom-dwn-button').length !== 0) return;
+  function createButton() {
+    if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
     const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
     const downButton = document.createElement('custom-dwn-button');
     const icon = document.createElement('div');
@@ -42,7 +42,9 @@
             font-size: 2.1rem;`;
     downButton.appendChild(icon);
     downButton.appendChild(text);
-    downButton.addEventListener('click', onClick);
+    downButton.addEventListener('click', () => {
+      window.open(document.location.href.replace('youtube', 'youtubepp'));
+    });
     downButton.addEventListener('mouseenter', () => {
       downButton.style.backgroundColor = 'rgba(255,255,255,0.1)';
     });
@@ -54,27 +56,43 @@
 
   function watchMenu() {
     const menu = document.getElementById('button-shape');
-    menu.addEventListener('click', addButton);
+    menu.addEventListener('click', createButton);
     replaced = true;
     clearTimeout(timeout);
   }
 
-  function onClick() {
-    window.open(document.location.href.replace('youtube', 'youtubepp'));
-  }
-
-  if (document.hidden) {
-    window.addEventListener('visibilitychange', () => {
-      if (document.hidden) return;
+  function modifyMenu() {
+    if (document.hidden) {
+      window.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        for (let i = 0; i < 10; i++) {
+          if (replaced) break;
+          timeout = setTimeout(watchMenu, 500 * i);
+        }
+      });
+    } else {
       for (let i = 0; i < 10; i++) {
         if (replaced) break;
         timeout = setTimeout(watchMenu, 500 * i);
       }
-    });
-  } else {
-    for (let i = 0; i < 10; i++) {
-      if (replaced) break;
-      timeout = setTimeout(watchMenu, 500 * i);
     }
   }
+
+  window.onload = function () {
+    modifyMenu();
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        if (oldHref != document.location.href) {
+          oldHref = document.location.href;
+          if (window.location.href.indexOf('youtube.com/watch') > -1) {
+            modifyMenu();
+          }
+        }
+      });
+    });
+    observer.observe(bodyList, {
+      childList: true,
+      subtree: true,
+    });
+  };
 })();
