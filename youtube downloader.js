@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube Downloader
-// @version             1.0.3
+// @version             1.0.4
 // @description         Add video download button in combo menu.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -78,13 +78,15 @@
     }
   }
 
+
   window.onload = function () {
+    const bodyList = document.querySelector('body');
     modifyMenu();
     const observer = new MutationObserver(function (mutations) {
       mutations.forEach(function (mutation) {
         if (oldHref != document.location.href) {
           oldHref = document.location.href;
-          if (window.location.href.indexOf('youtube.com/watch') > -1) {
+          if (window.location.href.indexOf('youtube.com/watch') > -1 || window.location.href.indexOf('youtube.com/shorts') > -1) {
             modifyMenu();
           }
         }
