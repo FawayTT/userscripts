@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube direct downloader
-// @version             2.0.3
+// @version             2.0.4
 // @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -76,6 +76,7 @@ let gmc = new GM_config({
     save: function () {
       gmc.close();
     },
+    init: onInit,
   },
 });
 
@@ -92,60 +93,60 @@ function opencfg() {
   `;
 }
 
-(function () {
-  let timeout;
-  let replaced = false;
-  let oldHref = document.location.href;
+let timeout;
+let oldHref = document.location.href;
+let menuIndex = 1;
+let menuMaxTries = 10;
 
-  function download(audioOnly) {
-    switch (gmc.get('downloadService')) {
-      case 'y2mate':
-        window.open(document.location.href.replace('youtube', 'youtubepp'));
-        break;
-      case 'yt1s':
-        if (audioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${encodeURI(document.location.href)}`);
-        else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${encodeURI(document.location.href)}`);
-        break;
-      default:
-        GM_xmlhttpRequest({
-          method: 'POST',
-          url: 'https://api.cobalt.tools/api/json',
-          headers: {
-            'Cache-Control': 'no-cache',
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          data: JSON.stringify({
-            url: encodeURI(document.location.href),
-            vQuality: gmc.get('quality'),
-            vCodec: gmc.get('videoCodec'),
-            aFormat: gmc.get('audioFormat'),
-            isAudioOnly: audioOnly || gmc.get('audioOnly'),
-          }),
-          onload: (response) => {
-            const data = JSON.parse(response.responseText);
-            if (data.url) window.open(data.url);
-          },
-        });
-        break;
-    }
+function download(audioOnly) {
+  switch (gmc.get('downloadService')) {
+    case 'y2mate':
+      window.open(document.location.href.replace('youtube', 'youtubepp'));
+      break;
+    case 'yt1s':
+      if (audioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${encodeURI(document.location.href)}`);
+      else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${encodeURI(document.location.href)}`);
+      break;
+    default:
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url: 'https://api.cobalt.tools/api/json',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        data: JSON.stringify({
+          url: encodeURI(document.location.href),
+          vQuality: gmc.get('quality'),
+          vCodec: gmc.get('videoCodec'),
+          aFormat: gmc.get('audioFormat'),
+          isAudioOnly: audioOnly || gmc.get('audioOnly'),
+        }),
+        onload: (response) => {
+          const data = JSON.parse(response.responseText);
+          if (data.url) window.open(data.url);
+        },
+      });
+      break;
   }
+}
 
-  function createButton() {
-    if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
-    const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
-    const downButtonOuter = document.createElement('custom-dwn-button');
-    const icon = document.createElement('div');
-    const text = document.createElement('div');
-    const downButton = document.createElement('button');
-    const extra = document.createElement('div');
-    const settings = document.createElement('div');
-    const downAudioOnly = document.createElement('div');
-    downAudioOnly.title = 'Download audio only';
-    settings.title = 'Settings';
-    menu.style.minHeight = '100px';
-    menu.style.minWidth = '150px';
-    downButtonOuter.style.cssText = `
+function createButton() {
+  if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
+  const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
+  const downButtonOuter = document.createElement('custom-dwn-button');
+  const icon = document.createElement('div');
+  const text = document.createElement('div');
+  const downButton = document.createElement('button');
+  const extra = document.createElement('div');
+  const settings = document.createElement('div');
+  const downAudioOnly = document.createElement('div');
+  downAudioOnly.title = 'Download audio only';
+  settings.title = 'Settings';
+  menu.style.minHeight = '100px';
+  menu.style.minWidth = '150px';
+  downButtonOuter.style.cssText = `
           cursor: pointer;
           margin-top: 8px;
           font-size: 1.4rem;
@@ -160,7 +161,7 @@ function opencfg() {
           padding: 10px 0 10px 21px;
           gap: 21px;
           align-items: center;`;
-    downButton.style.cssText = `
+  downButton.style.cssText = `
             position: absolute;
             left: 0;
             top: 0;
@@ -169,7 +170,7 @@ function opencfg() {
             opacity: 0;
             cursor: pointer;
             z-index: 9999;`;
-    extra.style.cssText = `
+  extra.style.cssText = `
             position: absolute;
             display: flex;
             flex-direction: column;
@@ -184,74 +185,77 @@ function opencfg() {
             top: 0;
             width: 10%;
             height: 90%;`;
-    icon.innerText = '⇩';
-    text.innerText = 'Download';
-    settings.innerText = '☰';
-    downAudioOnly.innerText = '▶';
-    icon.style.cssText = `
+  icon.innerText = '⇩';
+  text.innerText = 'Download';
+  settings.innerText = '☰';
+  downAudioOnly.innerText = '▶';
+  icon.style.cssText = `
             font-size: 2.1rem;`;
-    downButtonOuter.appendChild(icon);
-    downButtonOuter.appendChild(text);
-    downButtonOuter.appendChild(extra);
-    downButtonOuter.appendChild(downButton);
-    extra.appendChild(settings);
-    extra.appendChild(downAudioOnly);
-    downButton.addEventListener('click', () => {
-      download();
-    });
-    downAudioOnly.addEventListener('click', () => {
-      download(true);
-    });
-    settings.addEventListener('click', opencfg);
-    downButtonOuter.addEventListener('mouseenter', () => {
-      downButtonOuter.style.backgroundColor = 'rgba(255,255,255,0.1)';
-    });
-    downButtonOuter.addEventListener('mouseleave', () => {
-      downButtonOuter.style.backgroundColor = '';
-    });
-    menu.insertBefore(downButtonOuter, menu.firstChild);
-  }
+  downButtonOuter.appendChild(icon);
+  downButtonOuter.appendChild(text);
+  downButtonOuter.appendChild(extra);
+  downButtonOuter.appendChild(downButton);
+  extra.appendChild(settings);
+  extra.appendChild(downAudioOnly);
+  downButton.addEventListener('click', () => {
+    download();
+  });
+  downAudioOnly.addEventListener('click', () => {
+    download(true);
+  });
+  settings.addEventListener('click', opencfg);
+  downButtonOuter.addEventListener('mouseenter', () => {
+    downButtonOuter.style.backgroundColor = 'rgba(255,255,255,0.1)';
+  });
+  downButtonOuter.addEventListener('mouseleave', () => {
+    downButtonOuter.style.backgroundColor = '';
+  });
+  menu.insertBefore(downButtonOuter, menu.firstChild);
+}
 
-  function watchMenu() {
-    const menu = document.getElementById('button-shape');
-    menu.addEventListener('click', createButton);
-    replaced = true;
+function watchMenu() {
+  menuIndex += 1;
+  if (menuMaxTries < menuIndex) {
+    menuIndex = 1;
     clearTimeout(timeout);
+    return;
   }
+  const topRow = document.getElementById('top-row');
+  const menu = topRow.querySelector('#button-shape');
+  if (!topRow || !menu) {
+    timeout = setTimeout(watchMenu, 500 * menuIndex);
+    return;
+  }
+  menu.addEventListener('click', createButton);
+  menuIndex = 1;
+  clearTimeout(timeout);
+}
 
-  function modifyMenu() {
-    if (document.hidden) {
-      window.addEventListener('visibilitychange', () => {
-        if (document.hidden) return;
-        for (let i = 0; i < 10; i++) {
-          if (replaced) break;
-          timeout = setTimeout(watchMenu, 500 * i);
-        }
-      });
-    } else {
-      for (let i = 0; i < 10; i++) {
-        if (replaced) break;
-        timeout = setTimeout(watchMenu, 500 * i);
+function modifyMenu() {
+  if (document.location.href.indexOf('youtube.com/watch') === -1 && document.location.href.indexOf('youtube.com/shorts') === -1) return;
+  if (document.hidden) {
+    window.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      timeout = setTimeout(watchMenu, 500 * menuIndex);
+    });
+  } else {
+    timeout = setTimeout(watchMenu, 500 * menuIndex);
+  }
+}
+
+function onInit() {
+  const bodyList = document.querySelector('body');
+  modifyMenu();
+  const observer = new MutationObserver(function (mutations) {
+    mutations.forEach(function (mutation) {
+      if (oldHref != document.location.href) {
+        oldHref = document.location.href;
+        modifyMenu();
       }
-    }
-  }
-
-  window.onload = function () {
-    const bodyList = document.querySelector('body');
-    modifyMenu();
-    const observer = new MutationObserver(function (mutations) {
-      mutations.forEach(function (mutation) {
-        if (oldHref != document.location.href) {
-          oldHref = document.location.href;
-          if (window.location.href.indexOf('youtube.com/watch') > -1 || window.location.href.indexOf('youtube.com/shorts') > -1) {
-            modifyMenu();
-          }
-        }
-      });
     });
-    observer.observe(bodyList, {
-      childList: true,
-      subtree: true,
-    });
-  };
-})();
+  });
+  observer.observe(bodyList, {
+    childList: true,
+    subtree: true,
+  });
+}
