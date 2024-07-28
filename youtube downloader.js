@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                Youtube direct downloader
-// @version             2.0.1
-// @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4 or MP3 from youtube. You can choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
+// @version             2.0.2
+// @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4 or MP3 from youtube. You can choose your preferred quality from 8k or audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @icon                https://i.imgur.com/D57wQrY.png
@@ -14,9 +14,9 @@
 // @grant               GM_xmlhttpRequest
 // @license             MIT
 // ==/UserScript==
- 
+
 GM_registerMenuCommand('Settings', opencfg);
- 
+
 const defaults = {
   downloadService: 'cobalt',
   quality: 'max',
@@ -24,26 +24,7 @@ const defaults = {
   aFormat: 'mp3',
   audioOnly: false,
 };
- 
-const configcss = `height: 40rem;
-width: 35rem;
-border-radius: 10px;
-z-index: 9999999;
-position: fixed;
-`;
- 
-const qualities = {
-  MAX: 'max',
-  '2160p': '2160',
-  '1440p': '1440',
-  '1080p': '1080',
-  '720p': '720',
-  '480p': '480',
-  '360p': '360',
-  '240p': '240',
-  '144p': '144',
-};
- 
+
 let gmc = new GM_config({
   id: 'config',
   title: 'Youtube direct downloader settings',
@@ -65,20 +46,20 @@ let gmc = new GM_config({
       options: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
     },
     videoCodec: {
-      label: 'Video codec: (h264 for best compatibility, vp9 for best quality. AV1 = best quality but is used only by few videos.)',
+      label: 'Video codec: (h264 [MP4] for best compatibility, vp9 [WEBM] for better quality. AV1 = best quality but is used only by few videos.)',
       labelPos: 'left',
       type: 'select',
       default: defaults.vCodec,
       options: ['h264', 'vp9', 'av1'],
     },
     audioFormat: {
-      label: 'Audio format, mp3 for best compatibility, or opus (best) for best quality.',
+      label: 'Audio format.',
       type: 'select',
       default: defaults.aFormat,
-      options: ['best', 'mp3'],
+      options: ['best', 'mp3', 'ogg', 'wav', 'opus'],
     },
     audioOnly: {
-      label: 'Audio only',
+      label: 'Always download only audio',
       type: 'checkbox',
       default: defaults.audioOnly,
     },
@@ -97,17 +78,16 @@ let gmc = new GM_config({
     },
   },
 });
- 
+
 function opencfg() {
   gmc.open();
-  config.style = configcss;
 }
- 
+
 (function () {
   let timeout;
   let replaced = false;
   let oldHref = document.location.href;
- 
+
   function download(audioOnly) {
     switch (gmc.get('downloadService')) {
       case 'y2mate':
@@ -141,7 +121,7 @@ function opencfg() {
         break;
     }
   }
- 
+
   function createButton() {
     if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
     const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
@@ -222,14 +202,14 @@ function opencfg() {
     });
     menu.insertBefore(downButtonOuter, menu.firstChild);
   }
- 
+
   function watchMenu() {
     const menu = document.getElementById('button-shape');
     menu.addEventListener('click', createButton);
     replaced = true;
     clearTimeout(timeout);
   }
- 
+
   function modifyMenu() {
     if (document.hidden) {
       window.addEventListener('visibilitychange', () => {
@@ -246,7 +226,7 @@ function opencfg() {
       }
     }
   }
- 
+
   window.onload = function () {
     const bodyList = document.querySelector('body');
     modifyMenu();
