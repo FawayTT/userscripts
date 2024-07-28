@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                Youtube direct downloader
-// @version             2.0.2
-// @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4 or MP3 from youtube. You can choose your preferred quality from 8k or audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
+// @version             2.0.3
+// @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @icon                https://i.imgur.com/D57wQrY.png
@@ -30,7 +30,7 @@ let gmc = new GM_config({
   title: 'Youtube direct downloader settings',
   fields: {
     downloadService: {
-      section: ['Download method, use cobalt for best quality.'],
+      section: ['Download method (use cobalt for best quality):'],
       label: 'Service',
       labelPos: 'left',
       type: 'select',
@@ -38,28 +38,28 @@ let gmc = new GM_config({
       options: ['cobalt', 'y2mate', 'yt1s'],
     },
     quality: {
-      section: ['Cobalt settings'],
-      label: 'Quality',
+      section: ['Cobalt-only settings'],
+      label: 'Quality:',
       labelPos: 'left',
       type: 'select',
       default: defaults.quality,
       options: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
     },
     videoCodec: {
-      label: 'Video codec: (h264 [MP4] for best compatibility, vp9 [WEBM] for better quality. AV1 = best quality but is used only by few videos.)',
+      label: 'Video codec (h264 [MP4] for best compatibility, vp9 [WEBM] for better quality. AV1 = best quality but is used only by few videos):',
       labelPos: 'left',
       type: 'select',
       default: defaults.vCodec,
       options: ['h264', 'vp9', 'av1'],
     },
     audioFormat: {
-      label: 'Audio format.',
+      label: 'Audio format:',
       type: 'select',
       default: defaults.aFormat,
       options: ['best', 'mp3', 'ogg', 'wav', 'opus'],
     },
     audioOnly: {
-      label: 'Always download only audio',
+      label: 'Always download only audio:',
       type: 'checkbox',
       default: defaults.audioOnly,
     },
@@ -81,6 +81,15 @@ let gmc = new GM_config({
 
 function opencfg() {
   gmc.open();
+  config.style = `
+  width: 100%;
+  height: 100%;
+  max-height: 40rem;
+  max-width: 80rem;
+  border-radius: 10px;
+  z-index: 9999999;
+  position: fixed;
+  `;
 }
 
 (function () {
@@ -91,7 +100,7 @@ function opencfg() {
   function download(audioOnly) {
     switch (gmc.get('downloadService')) {
       case 'y2mate':
-        window.open(document.location.href.replace('youtube', 'y2mate'));
+        window.open(document.location.href.replace('youtube', 'youtubepp'));
         break;
       case 'yt1s':
         if (audioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${encodeURI(document.location.href)}`);
