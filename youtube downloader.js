@@ -1,28 +1,162 @@
 // ==UserScript==
-// @name                Youtube Downloader
-// @version             1.0.4
-// @description         Add video download button in combo menu.
+// @name                Youtube direct downloader
+// @version             2.0.1
+// @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4 or MP3 from youtube. You can choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @icon                https://i.imgur.com/D57wQrY.png
 // @match               https://www.youtube.com/*
-// @grant               none
+// @connect             api.cobalt.tools
+// @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
+// @grant               GM_getValue
+// @grant               GM_setValue
+// @grant               GM_registerMenuCommand
+// @grant               GM_xmlhttpRequest
 // @license             MIT
 // ==/UserScript==
-
+ 
+GM_registerMenuCommand('Settings', opencfg);
+ 
+const defaults = {
+  downloadService: 'cobalt',
+  quality: 'max',
+  vCodec: 'vp9',
+  aFormat: 'mp3',
+  audioOnly: false,
+};
+ 
+const configcss = `height: 40rem;
+width: 35rem;
+border-radius: 10px;
+z-index: 9999999;
+position: fixed;
+`;
+ 
+const qualities = {
+  MAX: 'max',
+  '2160p': '2160',
+  '1440p': '1440',
+  '1080p': '1080',
+  '720p': '720',
+  '480p': '480',
+  '360p': '360',
+  '240p': '240',
+  '144p': '144',
+};
+ 
+let gmc = new GM_config({
+  id: 'config',
+  title: 'Youtube direct downloader settings',
+  fields: {
+    downloadService: {
+      section: ['Download method, use cobalt for best quality.'],
+      label: 'Service',
+      labelPos: 'left',
+      type: 'select',
+      default: defaults.downloadService,
+      options: ['cobalt', 'y2mate', 'yt1s'],
+    },
+    quality: {
+      section: ['Cobalt settings'],
+      label: 'Quality',
+      labelPos: 'left',
+      type: 'select',
+      default: defaults.quality,
+      options: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
+    },
+    videoCodec: {
+      label: 'Video codec: (h264 for best compatibility, vp9 for best quality. AV1 = best quality but is used only by few videos.)',
+      labelPos: 'left',
+      type: 'select',
+      default: defaults.vCodec,
+      options: ['h264', 'vp9', 'av1'],
+    },
+    audioFormat: {
+      label: 'Audio format, mp3 for best compatibility, or opus (best) for best quality.',
+      type: 'select',
+      default: defaults.aFormat,
+      options: ['best', 'mp3'],
+    },
+    audioOnly: {
+      label: 'Audio only',
+      type: 'checkbox',
+      default: defaults.audioOnly,
+    },
+    url: {
+      section: ['Support'],
+      label: 'https://github.com/FawayTT/userscripts',
+      type: 'button',
+      click: () => {
+        GM_openInTab('https://github.com/FawayTT/userscripts');
+      },
+    },
+  },
+  events: {
+    save: function () {
+      gmc.close();
+    },
+  },
+});
+ 
+function opencfg() {
+  gmc.open();
+  config.style = configcss;
+}
+ 
 (function () {
   let timeout;
   let replaced = false;
   let oldHref = document.location.href;
-
+ 
+  function download(audioOnly) {
+    switch (gmc.get('downloadService')) {
+      case 'y2mate':
+        window.open(document.location.href.replace('youtube', 'y2mate'));
+        break;
+      case 'yt1s':
+        if (audioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${encodeURI(document.location.href)}`);
+        else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${encodeURI(document.location.href)}`);
+        break;
+      default:
+        GM_xmlhttpRequest({
+          method: 'POST',
+          url: 'https://api.cobalt.tools/api/json',
+          headers: {
+            'Cache-Control': 'no-cache',
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          data: JSON.stringify({
+            url: encodeURI(document.location.href),
+            vQuality: gmc.get('quality'),
+            vCodec: gmc.get('videoCodec'),
+            aFormat: gmc.get('audioFormat'),
+            isAudioOnly: audioOnly || gmc.get('audioOnly'),
+          }),
+          onload: (response) => {
+            const data = JSON.parse(response.responseText);
+            if (data.url) window.open(data.url);
+          },
+        });
+        break;
+    }
+  }
+ 
   function createButton() {
     if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
     const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
-    const downButton = document.createElement('custom-dwn-button');
+    const downButtonOuter = document.createElement('custom-dwn-button');
     const icon = document.createElement('div');
     const text = document.createElement('div');
+    const downButton = document.createElement('button');
+    const extra = document.createElement('div');
+    const settings = document.createElement('div');
+    const downAudioOnly = document.createElement('div');
+    downAudioOnly.title = 'Download audio only';
+    settings.title = 'Settings';
     menu.style.minHeight = '100px';
-    downButton.style.cssText = `
+    menu.style.minWidth = '150px';
+    downButtonOuter.style.cssText = `
           cursor: pointer;
           margin-top: 8px;
           font-size: 1.4rem;
@@ -33,34 +167,69 @@
           font-family: "Roboto","Arial",sans-serif;
           white-space: nowrap;
           display: flex;
+          margin-bottom: -10px;
           padding: 10px 0 10px 21px;
           gap: 21px;
           align-items: center;`;
+    downButton.style.cssText = `
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 90%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 9999;`;
+    extra.style.cssText = `
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            padding: 1px;
+            color:white;
+            z-index: 9999;
+            right: 0;
+            top: 0;
+            width: 10%;
+            height: 90%;`;
     icon.innerText = '⇩';
     text.innerText = 'Download';
+    settings.innerText = '☰';
+    downAudioOnly.innerText = '▶';
     icon.style.cssText = `
             font-size: 2.1rem;`;
-    downButton.appendChild(icon);
-    downButton.appendChild(text);
+    downButtonOuter.appendChild(icon);
+    downButtonOuter.appendChild(text);
+    downButtonOuter.appendChild(extra);
+    downButtonOuter.appendChild(downButton);
+    extra.appendChild(settings);
+    extra.appendChild(downAudioOnly);
     downButton.addEventListener('click', () => {
-      window.open(document.location.href.replace('youtube', 'youtubepp'));
+      download();
     });
-    downButton.addEventListener('mouseenter', () => {
-      downButton.style.backgroundColor = 'rgba(255,255,255,0.1)';
+    downAudioOnly.addEventListener('click', () => {
+      download(true);
     });
-    downButton.addEventListener('mouseleave', () => {
-      downButton.style.backgroundColor = '';
+    settings.addEventListener('click', opencfg);
+    downButtonOuter.addEventListener('mouseenter', () => {
+      downButtonOuter.style.backgroundColor = 'rgba(255,255,255,0.1)';
     });
-    menu.insertBefore(downButton, menu.firstChild);
+    downButtonOuter.addEventListener('mouseleave', () => {
+      downButtonOuter.style.backgroundColor = '';
+    });
+    menu.insertBefore(downButtonOuter, menu.firstChild);
   }
-
+ 
   function watchMenu() {
     const menu = document.getElementById('button-shape');
     menu.addEventListener('click', createButton);
     replaced = true;
     clearTimeout(timeout);
   }
-
+ 
   function modifyMenu() {
     if (document.hidden) {
       window.addEventListener('visibilitychange', () => {
@@ -77,8 +246,7 @@
       }
     }
   }
-
-
+ 
   window.onload = function () {
     const bodyList = document.querySelector('body');
     modifyMenu();
