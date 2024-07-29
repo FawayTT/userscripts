@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube direct downloader
-// @version             2.0.4
+// @version             2.0.5
 // @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -11,6 +11,7 @@
 // @grant               GM_getValue
 // @grant               GM_setValue
 // @grant               GM_registerMenuCommand
+// @grant               GM_openInTab
 // @grant               GM_xmlhttpRequest
 // @license             MIT
 // ==/UserScript==
@@ -22,6 +23,9 @@ const defaults = {
   quality: 'max',
   vCodec: 'vp9',
   aFormat: 'mp3',
+  filenamePattern: 'pretty',
+  isAudioMuted: false,
+  disableMetadata: false,
   audioOnly: false,
 };
 
@@ -63,12 +67,35 @@ let gmc = new GM_config({
       type: 'checkbox',
       default: defaults.audioOnly,
     },
+    isAudioMuted: {
+      label: 'Download videos without audio:',
+      type: 'checkbox',
+      default: defaults.isAudioMuted,
+    },
+    disableMetadata: {
+      label: 'Download videos without metadata:',
+      type: 'checkbox',
+      default: defaults.disableMetadata,
+    },
+    filenamePattern: {
+      label: 'Filename pattern:',
+      type: 'select',
+      default: defaults.filenamePattern,
+      options: ['classic', 'pretty', 'basic', 'nerdy', 'opus'],
+    },
     url: {
       section: ['Support'],
-      label: 'https://github.com/FawayTT/userscripts',
+      label: 'My other userscripts',
       type: 'button',
       click: () => {
         GM_openInTab('https://github.com/FawayTT/userscripts');
+      },
+    },
+    cobaltUrl: {
+      label: 'Cobalt',
+      type: 'button',
+      click: () => {
+        GM_openInTab('https://github.com/imputnet/cobalt');
       },
     },
   },
@@ -98,21 +125,26 @@ let oldHref = document.location.href;
 let menuIndex = 1;
 let menuMaxTries = 10;
 
+function getYouTubeVideoID(url) {
+  const urlParams = new URLSearchParams(new URL(url).search);
+  return urlParams.get('v');
+}
+
 function download(audioOnly) {
   switch (gmc.get('downloadService')) {
     case 'y2mate':
-      window.open(document.location.href.replace('youtube', 'youtubepp'));
+      if (audioOnly) window.open(`https://www.y2mate.com/youtube-mp3/${getYouTubeVideoID(document.location.href)}`);
+      else window.open(`https://www.y2mate.com/download-youtube/${getYouTubeVideoID(document.location.href)}`);
       break;
     case 'yt1s':
-      if (audioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${encodeURI(document.location.href)}`);
-      else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${encodeURI(document.location.href)}`);
+      if (audioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
+      else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
       break;
     default:
       GM_xmlhttpRequest({
         method: 'POST',
         url: 'https://api.cobalt.tools/api/json',
         headers: {
-          'Cache-Control': 'no-cache',
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
@@ -121,6 +153,9 @@ function download(audioOnly) {
           vQuality: gmc.get('quality'),
           vCodec: gmc.get('videoCodec'),
           aFormat: gmc.get('audioFormat'),
+          filenamePattern: gmc.get('filenamePattern'),
+          isAudioMuted: gmc.get('isAudioMuted'),
+          disableMetadata: gmc.get('disableMetadata'),
           isAudioOnly: audioOnly || gmc.get('audioOnly'),
         }),
         onload: (response) => {
