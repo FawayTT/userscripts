@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                Youtube direct downloader
-// @version             2.0.5
-// @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
+// @version             2.1.0
+// @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @icon                https://i.imgur.com/D57wQrY.png
@@ -15,9 +15,9 @@
 // @grant               GM_xmlhttpRequest
 // @license             MIT
 // ==/UserScript==
-
+ 
 GM_registerMenuCommand('Settings', opencfg);
-
+ 
 const defaults = {
   downloadService: 'cobalt',
   quality: 'max',
@@ -27,8 +27,9 @@ const defaults = {
   isAudioMuted: false,
   disableMetadata: false,
   audioOnly: false,
+  redirectShorts: false,
 };
-
+ 
 let gmc = new GM_config({
   id: 'config',
   title: 'Youtube direct downloader settings',
@@ -83,8 +84,15 @@ let gmc = new GM_config({
       default: defaults.filenamePattern,
       options: ['classic', 'pretty', 'basic', 'nerdy', 'opus'],
     },
+    redirectShorts: {
+      section: ['Extra features'],
+      label: 'Redirect shorts:',
+      labelPos: 'left',
+      type: 'checkbox',
+      default: defaults.redirectShorts,
+    },
     url: {
-      section: ['Support'],
+      section: ['Links'],
       label: 'My other userscripts',
       type: 'button',
       click: () => {
@@ -106,7 +114,7 @@ let gmc = new GM_config({
     init: onInit,
   },
 });
-
+ 
 function opencfg() {
   gmc.open();
   config.style = `
@@ -119,17 +127,17 @@ function opencfg() {
   position: fixed;
   `;
 }
-
+ 
 let timeout;
 let oldHref = document.location.href;
 let menuIndex = 1;
 let menuMaxTries = 10;
-
+ 
 function getYouTubeVideoID(url) {
   const urlParams = new URLSearchParams(new URL(url).search);
   return urlParams.get('v');
 }
-
+ 
 function download(audioOnly) {
   switch (gmc.get('downloadService')) {
     case 'y2mate':
@@ -166,7 +174,7 @@ function download(audioOnly) {
       break;
   }
 }
-
+ 
 function createButton() {
   if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
   const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
@@ -214,7 +222,7 @@ function createButton() {
             background: rgba(255, 255, 255, 0.2);
             border-radius: 3px;
             padding: 1px;
-            color:white;
+            color: var(--yt-spec-text-primary);
             z-index: 9999;
             right: 0;
             top: 0;
@@ -240,14 +248,14 @@ function createButton() {
   });
   settings.addEventListener('click', opencfg);
   downButtonOuter.addEventListener('mouseenter', () => {
-    downButtonOuter.style.backgroundColor = 'rgba(255,255,255,0.1)';
+    downButtonOuter.style.backgroundColor = 'var(--yt-spec-10-percent-layer)';
   });
   downButtonOuter.addEventListener('mouseleave', () => {
     downButtonOuter.style.backgroundColor = '';
   });
   menu.insertBefore(downButtonOuter, menu.firstChild);
 }
-
+ 
 function watchMenu() {
   menuIndex += 1;
   if (menuMaxTries < menuIndex) {
@@ -255,17 +263,30 @@ function watchMenu() {
     clearTimeout(timeout);
     return;
   }
+  if (document.location.href.indexOf('youtube.com/shorts') > -1) {
+    const menu = document.getElementById('menu-button');
+    if (!menu) {
+      timeout = setTimeout(watchMenu, 500 * menuIndex);
+      return;
+    }
+    menu.addEventListener('click', createButton);
+    menuIndex = 1;
+    clearTimeout(timeout);
+    return;
+  }
   const topRow = document.getElementById('top-row');
   const menu = topRow.querySelector('#button-shape');
   if (!topRow || !menu) {
-    timeout = setTimeout(watchMenu, 500 * menuIndex);
+    timeout = setTimeout(() => {
+      watchMenu(false);
+    }, 500 * menuIndex);
     return;
   }
   menu.addEventListener('click', createButton);
   menuIndex = 1;
   clearTimeout(timeout);
 }
-
+ 
 function modifyMenu() {
   if (document.location.href.indexOf('youtube.com/watch') === -1 && document.location.href.indexOf('youtube.com/shorts') === -1) return;
   if (document.hidden) {
@@ -273,17 +294,21 @@ function modifyMenu() {
       if (document.hidden) return;
       timeout = setTimeout(watchMenu, 500 * menuIndex);
     });
-  } else {
-    timeout = setTimeout(watchMenu, 500 * menuIndex);
-  }
+  } else timeout = setTimeout(watchMenu, 500 * menuIndex);
 }
-
+ 
+function checkShort() {
+  if (document.location.href.indexOf('youtube.com/shorts') > -1 && gmc.get('redirectShorts')) window.location.replace(window.location.toString().replace('/shorts/', '/watch?v='));
+}
+ 
 function onInit() {
   const bodyList = document.querySelector('body');
+  checkShort();
   modifyMenu();
   const observer = new MutationObserver(function (mutations) {
     mutations.forEach(function (mutation) {
       if (oldHref != document.location.href) {
+        checkShort();
         oldHref = document.location.href;
         modifyMenu();
       }
