@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name                Youtube direct downloader
-// @version             2.1.0
+// @version             2.1.2
 // @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
-// @icon                https://i.imgur.com/D57wQrY.png
+// @supportURL          https://github.com/FawayTT/userscripts/issues
+// @icon                https://github.com/FawayTT/userscripts/blob/main/youtube-downloader-icon.png?raw=true
 // @match               https://www.youtube.com/*
 // @connect             api.cobalt.tools
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
@@ -15,9 +16,9 @@
 // @grant               GM_xmlhttpRequest
 // @license             MIT
 // ==/UserScript==
- 
+
 GM_registerMenuCommand('Settings', opencfg);
- 
+
 const defaults = {
   downloadService: 'cobalt',
   quality: 'max',
@@ -29,7 +30,7 @@ const defaults = {
   audioOnly: false,
   redirectShorts: false,
 };
- 
+
 let gmc = new GM_config({
   id: 'config',
   title: 'Youtube direct downloader settings',
@@ -114,7 +115,7 @@ let gmc = new GM_config({
     init: onInit,
   },
 });
- 
+
 function opencfg() {
   gmc.open();
   config.style = `
@@ -127,17 +128,17 @@ function opencfg() {
   position: fixed;
   `;
 }
- 
+
 let timeout;
 let oldHref = document.location.href;
 let menuIndex = 1;
 let menuMaxTries = 10;
- 
+
 function getYouTubeVideoID(url) {
   const urlParams = new URLSearchParams(new URL(url).search);
   return urlParams.get('v');
 }
- 
+
 function download(audioOnly) {
   switch (gmc.get('downloadService')) {
     case 'y2mate':
@@ -174,7 +175,11 @@ function download(audioOnly) {
       break;
   }
 }
- 
+
+function capitalize(s){
+    return s[0].toUpperCase() + s.slice(1);
+}
+
 function createButton() {
   if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
   const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
@@ -202,7 +207,7 @@ function createButton() {
           display: flex;
           margin-bottom: -10px;
           padding: 10px 0 10px 21px;
-          gap: 21px;
+          gap: 23px;
           align-items: center;`;
   downButton.style.cssText = `
             position: absolute;
@@ -229,7 +234,8 @@ function createButton() {
             width: 10%;
             height: 90%;`;
   icon.innerText = '⇩';
-  text.innerText = 'Download';
+  const serviceName = gmc.get('downloadService') || 'Cobalt';
+  text.innerText = capitalize(serviceName);
   settings.innerText = '☰';
   downAudioOnly.innerText = '▶';
   icon.style.cssText = `
@@ -255,7 +261,7 @@ function createButton() {
   });
   menu.insertBefore(downButtonOuter, menu.firstChild);
 }
- 
+
 function watchMenu() {
   menuIndex += 1;
   if (menuMaxTries < menuIndex) {
@@ -286,7 +292,7 @@ function watchMenu() {
   menuIndex = 1;
   clearTimeout(timeout);
 }
- 
+
 function modifyMenu() {
   if (document.location.href.indexOf('youtube.com/watch') === -1 && document.location.href.indexOf('youtube.com/shorts') === -1) return;
   if (document.hidden) {
@@ -296,11 +302,11 @@ function modifyMenu() {
     });
   } else timeout = setTimeout(watchMenu, 500 * menuIndex);
 }
- 
+
 function checkShort() {
   if (document.location.href.indexOf('youtube.com/shorts') > -1 && gmc.get('redirectShorts')) window.location.replace(window.location.toString().replace('/shorts/', '/watch?v='));
 }
- 
+
 function onInit() {
   const bodyList = document.querySelector('body');
   checkShort();
