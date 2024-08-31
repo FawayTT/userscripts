@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name                Youtube direct downloader
-// @version             2.1.2
+// @name                Youtube Direct Downloader
+// @version             2.1.3
 // @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -20,14 +20,14 @@
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
-  downloadService: 'cobalt',
+  downloadService: 'Cobalt',
   quality: 'max',
   vCodec: 'vp9',
   aFormat: 'mp3',
   filenamePattern: 'pretty',
+  buttonDownloadInfo: 'onchange',
   isAudioMuted: false,
   disableMetadata: false,
-  audioOnly: false,
   redirectShorts: false,
 };
 
@@ -51,23 +51,18 @@ let gmc = new GM_config({
       default: defaults.quality,
       options: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
     },
-    videoCodec: {
+    vCodec: {
       label: 'Video codec (h264 [MP4] for best compatibility, vp9 [WEBM] for better quality. AV1 = best quality but is used only by few videos):',
       labelPos: 'left',
       type: 'select',
       default: defaults.vCodec,
       options: ['h264', 'vp9', 'av1'],
     },
-    audioFormat: {
+    aFormat: {
       label: 'Audio format:',
       type: 'select',
       default: defaults.aFormat,
       options: ['best', 'mp3', 'ogg', 'wav', 'opus'],
-    },
-    audioOnly: {
-      label: 'Always download only audio:',
-      type: 'checkbox',
-      default: defaults.audioOnly,
     },
     isAudioMuted: {
       label: 'Download videos without audio:',
@@ -84,6 +79,12 @@ let gmc = new GM_config({
       type: 'select',
       default: defaults.filenamePattern,
       options: ['classic', 'pretty', 'basic', 'nerdy', 'opus'],
+    },
+    buttonDownloadInfo: {
+      label: 'Show quality info below button:',
+      type: 'select',
+      default: defaults.buttonDownloadInfo,
+      options: ['always', 'onchange', 'never'],
     },
     redirectShorts: {
       section: ['Extra features'],
@@ -111,6 +112,8 @@ let gmc = new GM_config({
   events: {
     save: function () {
       gmc.close();
+      deleteButton();
+      createButton();
     },
     init: onInit,
   },
@@ -132,21 +135,21 @@ function opencfg() {
 let timeout;
 let oldHref = document.location.href;
 let menuIndex = 1;
-let menuMaxTries = 10;
+const menuMaxTries = 10;
 
 function getYouTubeVideoID(url) {
   const urlParams = new URLSearchParams(new URL(url).search);
   return urlParams.get('v');
 }
 
-function download(audioOnly) {
+function download(isAudioOnly) {
   switch (gmc.get('downloadService')) {
     case 'y2mate':
-      if (audioOnly) window.open(`https://www.y2mate.com/youtube-mp3/${getYouTubeVideoID(document.location.href)}`);
+      if (isAudioOnly) window.open(`https://www.y2mate.com/youtube-mp3/${getYouTubeVideoID(document.location.href)}`);
       else window.open(`https://www.y2mate.com/download-youtube/${getYouTubeVideoID(document.location.href)}`);
       break;
     case 'yt1s':
-      if (audioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
+      if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
       break;
     default:
@@ -160,12 +163,12 @@ function download(audioOnly) {
         data: JSON.stringify({
           url: encodeURI(document.location.href),
           vQuality: gmc.get('quality'),
-          vCodec: gmc.get('videoCodec'),
-          aFormat: gmc.get('audioFormat'),
+          vCodec: gmc.get('vCodec'),
+          aFormat: gmc.get('aFormat'),
           filenamePattern: gmc.get('filenamePattern'),
           isAudioMuted: gmc.get('isAudioMuted'),
           disableMetadata: gmc.get('disableMetadata'),
-          isAudioOnly: audioOnly || gmc.get('audioOnly'),
+          isAudioOnly: isAudioOnly,
         }),
         onload: (response) => {
           const data = JSON.parse(response.responseText);
@@ -176,24 +179,47 @@ function download(audioOnly) {
   }
 }
 
-function capitalize(s){
-    return s[0].toUpperCase() + s.slice(1);
+function addButtonDownloadInfo(serviceName, div) {
+  if (serviceName === 'cobalt') {
+    const option = gmc.get('buttonDownloadInfo');
+    if (option === 'never') return;
+    const quality = gmc.get('quality') || defaults.quality;
+    const vCodec = gmc.get('vCodec') || defaults.vCodec;
+    if (option === 'onchange' && quality === defaults.quality && vCodec === defaults.vCodec) return;
+    const qualityText = `${quality}, ${vCodec}`;
+    const downloadInfo = document.createElement('custom-dwn-button-download-info');
+    downloadInfo.style.cssText = `
+                position: absolute;
+                left: 0;
+                bottom: -10px;
+                font-size: 0.8rem;
+                color: var(--yt-spec-text-primary);
+                opacity: 0.6;`;
+    downloadInfo.innerText = qualityText;
+    div.appendChild(downloadInfo);
+  }
+}
+
+function deleteButton() {
+  if (document.getElementsByTagName('custom-dwn-button').length === 0) return;
+  const button = document.getElementsByTagName('custom-dwn-button')[0];
+  button.remove();
 }
 
 function createButton() {
   if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
+  const serviceName = gmc.get('downloadService') || defaults.downloadService;
   const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
   const downButtonOuter = document.createElement('custom-dwn-button');
   const icon = document.createElement('div');
-  const text = document.createElement('div');
+  const text = document.createElement('custom-dwn-button-text');
   const downButton = document.createElement('button');
   const extra = document.createElement('div');
   const settings = document.createElement('div');
   const downAudioOnly = document.createElement('div');
-  downAudioOnly.title = 'Download audio only';
-  settings.title = 'Settings';
   menu.style.minHeight = '100px';
   menu.style.minWidth = '150px';
+  text.style.position = 'relative';
   downButtonOuter.style.cssText = `
           cursor: pointer;
           margin-top: 8px;
@@ -208,7 +234,8 @@ function createButton() {
           margin-bottom: -10px;
           padding: 10px 0 10px 21px;
           gap: 23px;
-          align-items: center;`;
+          align-items: center;
+          text-transform: capitalize`;
   downButton.style.cssText = `
             position: absolute;
             left: 0;
@@ -233,13 +260,15 @@ function createButton() {
             top: 0;
             width: 10%;
             height: 90%;`;
-  icon.innerText = '⇩';
-  const serviceName = gmc.get('downloadService') || 'Cobalt';
-  text.innerText = capitalize(serviceName);
-  settings.innerText = '☰';
-  downAudioOnly.innerText = '▶';
   icon.style.cssText = `
             font-size: 2.1rem;`;
+  icon.innerText = '⇩';
+  text.innerText = serviceName;
+  settings.innerText = '☰';
+  downAudioOnly.innerText = '▶';
+  addButtonDownloadInfo(serviceName, text);
+  downAudioOnly.title = `Download audio only`;
+  settings.title = 'Settings';
   downButtonOuter.appendChild(icon);
   downButtonOuter.appendChild(text);
   downButtonOuter.appendChild(extra);
