@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube Direct Downloader
-// @version             2.1.3
+// @version             2.1.4
 // @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -133,6 +133,9 @@ function opencfg() {
 }
 
 let timeout;
+let menuOuter;
+let menuParent;
+let nextSibling;
 let oldHref = document.location.href;
 let menuIndex = 1;
 const menuMaxTries = 10;
@@ -173,10 +176,20 @@ function download(isAudioOnly) {
         onload: (response) => {
           const data = JSON.parse(response.responseText);
           if (data.url) window.open(data.url);
+          else alert('Cobalt is down. Please try again later.');
+        },
+        onerror: function (error) {
+          // Handle network or request errors
+          alert('Cobalt error occurred:', error);
+        },
+        ontimeout: function () {
+          // Handle timeout errors
+          alert('Cobalt is down. Please try again later.');
         },
       });
       break;
   }
+  hideMenu();
 }
 
 function addButtonDownloadInfo(serviceName, div) {
@@ -206,7 +219,32 @@ function deleteButton() {
   button.remove();
 }
 
+function hideMenu() {
+  const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
+  if (!menu) return;
+  menuOuter = menu.parentElement.parentElement;
+  if (!menuOuter) return;
+  menuParent = menuOuter.parentNode;
+  nextSibling = menuOuter.nextSibling;
+  menuOuter.remove();
+}
+
+function addMenu(hidden) {
+  if (menuOuter && menuParent) {
+    if (nextSibling) {
+      menuParent.insertBefore(menuOuter, nextSibling);
+    } else {
+      menuParent.appendChild(menuOuter);
+    }
+    if (hidden) menuOuter.style.display = 'none';
+    menuOuter = null;
+    menuParent = null;
+    nextSibling = null;
+  }
+}
+
 function createButton() {
+  addMenu();
   if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
   const serviceName = gmc.get('downloadService') || defaults.downloadService;
   const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
@@ -218,7 +256,7 @@ function createButton() {
   const settings = document.createElement('div');
   const downAudioOnly = document.createElement('div');
   menu.style.minHeight = '100px';
-  menu.style.minWidth = '150px';
+  menu.style.minWidth = '133px';
   text.style.position = 'relative';
   downButtonOuter.style.cssText = `
           cursor: pointer;
@@ -278,6 +316,7 @@ function createButton() {
   downButton.addEventListener('click', () => {
     download();
   });
+
   downAudioOnly.addEventListener('click', () => {
     download(true);
   });
@@ -293,31 +332,34 @@ function createButton() {
 
 function watchMenu() {
   menuIndex += 1;
+  menuOuter = null;
+  menuParent = null;
+  nextSibling = null;
   if (menuMaxTries < menuIndex) {
     menuIndex = 1;
     clearTimeout(timeout);
     return;
   }
   if (document.location.href.indexOf('youtube.com/shorts') > -1) {
-    const menu = document.getElementById('menu-button');
-    if (!menu) {
+    const menuBtn = document.getElementById('menu-button');
+    if (!menuBtn) {
       timeout = setTimeout(watchMenu, 500 * menuIndex);
       return;
     }
-    menu.addEventListener('click', createButton);
+    menuBtn.addEventListener('click', createButton);
     menuIndex = 1;
     clearTimeout(timeout);
     return;
   }
   const topRow = document.getElementById('top-row');
-  const menu = topRow.querySelector('#button-shape');
-  if (!topRow || !menu) {
+  const menuBtn = topRow.querySelector('#button-shape');
+  if (!topRow || !menuBtn) {
     timeout = setTimeout(() => {
-      watchMenu(false);
+      watchMenu();
     }, 500 * menuIndex);
     return;
   }
-  menu.addEventListener('click', createButton);
+  menuBtn.addEventListener('click', createButton);
   menuIndex = 1;
   clearTimeout(timeout);
 }
@@ -345,6 +387,7 @@ function onInit() {
       if (oldHref != document.location.href) {
         checkShort();
         oldHref = document.location.href;
+        addMenu(true);
         modifyMenu();
       }
     });
