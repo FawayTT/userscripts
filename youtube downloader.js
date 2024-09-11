@@ -15,6 +15,8 @@
 // @grant               GM_openInTab
 // @grant               GM_xmlhttpRequest
 // @license             MIT
+// @downloadURL https://update.greasyfork.org/scripts/481954/Youtube%20Direct%20Downloader.user.js
+// @updateURL https://update.greasyfork.org/scripts/481954/Youtube%20Direct%20Downloader.meta.js
 // ==/UserScript==
 
 GM_registerMenuCommand('Settings', opencfg);
@@ -29,7 +31,10 @@ const defaults = {
   isAudioMuted: false,
   disableMetadata: false,
   redirectShorts: false,
+  backupProvider: 'y2mate',
 };
+
+const providers = ['cobalt', 'y2mate', 'yt1s'];
 
 let gmc = new GM_config({
   id: 'config',
@@ -85,6 +90,12 @@ let gmc = new GM_config({
       type: 'select',
       default: defaults.buttonDownloadInfo,
       options: ['always', 'onchange', 'never'],
+    },
+    backupProvider: {
+      label: 'Pick backup provider in case Cobalt is not responding:',
+      type: 'select',
+      default: defaults.backupProvider,
+      options: ['y2mate', 'yt1s', 'none'],
     },
     redirectShorts: {
       section: ['Extra features'],
@@ -145,8 +156,9 @@ function getYouTubeVideoID(url) {
   return urlParams.get('v');
 }
 
-function download(isAudioOnly) {
-  switch (gmc.get('downloadService')) {
+function download(isAudioOnly, downloadService) {
+  if (!downloadService) downloadService = gmc.get('downloadService');
+  switch (downloadService) {
     case 'y2mate':
       if (isAudioOnly) window.open(`https://www.y2mate.com/youtube-mp3/${getYouTubeVideoID(document.location.href)}`);
       else window.open(`https://www.y2mate.com/download-youtube/${getYouTubeVideoID(document.location.href)}`);
@@ -155,7 +167,7 @@ function download(isAudioOnly) {
       if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
       break;
-    default:
+    case 'cobalt':
       GM_xmlhttpRequest({
         method: 'POST',
         url: 'https://api.cobalt.tools/api/json',
@@ -176,17 +188,38 @@ function download(isAudioOnly) {
         onload: (response) => {
           const data = JSON.parse(response.responseText);
           if (data.url) window.open(data.url);
-          else alert('Cobalt is down. Please try again later.');
+          else {
+            let alertText = 'Cobalt error: ' + data.text || 'Something went wrong! Try again later.';
+            const backupProvider = gmc.get('backupProvider');
+            if (backupProvider !== 'none') {
+              alertText += '\n\nYou will be redirected to backup provider ' + backupProvider + '.';
+              alert(alertText);
+              download(isAudioOnly, backupProvider);
+            } else alert(alertText);
+          }
         },
         onerror: function (error) {
-          // Handle network or request errors
-          alert('Cobalt error occurred:', error);
+          const errorMessage = error.message || error;
+          let alertText = 'Cobalt error occurred: ' + errorMessage;
+          const backupProvider = gmc.get('backupProvider');
+          if (backupProvider !== 'none') {
+            alertText += '\n\nYou will be redirected to backup provider ' + backupProvider + '.';
+            alert(alertText);
+            download(isAudioOnly, backupProvider);
+          } else alert(alertText);
         },
         ontimeout: function () {
-          // Handle timeout errors
-          alert('Cobalt is down. Please try again later.');
+          let alertText = 'Cobalt is not responding. Please try again later.';
+          const backupProvider = gmc.get('backupProvider');
+          if (backupProvider !== 'none') {
+            alertText += '\n\nYou will be redirected to backup provider ' + backupProvider + '.';
+            alert(alertText);
+            download(isAudioOnly, backupProvider);
+          } else alert(alertText);
         },
       });
+      break;
+    default:
       break;
   }
   hideMenu();
@@ -232,9 +265,9 @@ function hideMenu() {
 function addMenu(hidden) {
   if (menuOuter && menuParent) {
     if (nextSibling) {
-      menuParent.insertBefore(menuOuter, nextSibling);
+      menuParent.insertBefore(menuOuter, nextSibling); // Re-insert before the next sibling if it exists
     } else {
-      menuParent.appendChild(menuOuter);
+      menuParent.appendChild(menuOuter); // Append if it's the last child
     }
     if (hidden) menuOuter.style.display = 'none';
     menuOuter = null;
@@ -315,10 +348,12 @@ function createButton() {
   extra.appendChild(downAudioOnly);
   downButton.addEventListener('click', () => {
     download();
+    downButtonOuter.style.backgroundColor = '';
   });
 
   downAudioOnly.addEventListener('click', () => {
     download(true);
+    downButtonOuter.style.backgroundColor = '';
   });
   settings.addEventListener('click', opencfg);
   downButtonOuter.addEventListener('mouseenter', () => {
