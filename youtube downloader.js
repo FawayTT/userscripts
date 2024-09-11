@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube Direct Downloader
-// @version             2.1.4
+// @version             2.1.5
 // @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -15,8 +15,6 @@
 // @grant               GM_openInTab
 // @grant               GM_xmlhttpRequest
 // @license             MIT
-// @downloadURL https://update.greasyfork.org/scripts/481954/Youtube%20Direct%20Downloader.user.js
-// @updateURL https://update.greasyfork.org/scripts/481954/Youtube%20Direct%20Downloader.meta.js
 // ==/UserScript==
 
 GM_registerMenuCommand('Settings', opencfg);
