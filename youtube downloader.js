@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube Direct Downloader
-// @version             2.1.6
+// @version             2.1.7
 // @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -20,7 +20,7 @@
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
-  downloadService: 'Cobalt',
+  downloadService: 'cobalt',
   quality: 'max',
   vCodec: 'vp9',
   aFormat: 'mp3',
@@ -32,8 +32,6 @@ const defaults = {
   backupProvider: 'y2mate',
   subscribeButton: true,
 };
-
-const providers = ['cobalt', 'y2mate', 'yt1s'];
 
 let gmc = new GM_config({
   id: 'config',
@@ -47,7 +45,7 @@ let gmc = new GM_config({
       default: defaults.subscribeButton,
     },
     downloadService: {
-      section: ['Download method (use cobalt for best quality):'],
+      section: ['Download method (use cobalt for best quality)'],
       label: 'Service',
       labelPos: 'left',
       type: 'select',
@@ -383,7 +381,7 @@ function deleteSubscribeButton() {
 function createSubscribeButton() {
   if (!gmc.get('subscribeButton')) return;
   const ownerBar = document.getElementById('owner');
-  if (!ownerBar) return;
+  if (!ownerBar || document.getElementById('custom-dwn-button-sub')) return;
   const downButton = document.createElement('button');
   downButton.id = 'custom-dwn-button-sub';
   downButton.style.cssText = `
