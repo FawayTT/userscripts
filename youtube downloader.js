@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                Youtube Direct Downloader
-// @version             2.1.7
-// @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
+// @version             2.2.0
+// @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @supportURL          https://github.com/FawayTT/userscripts/issues
@@ -16,6 +16,198 @@
 // @grant               GM_xmlhttpRequest
 // @license             MIT
 // ==/UserScript==
+
+const gmcCSS = `
+ #YDD_config {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(10px);
+  color: #fff !important;
+  border-radius: 30px !important;
+  padding: 20px !important;
+  max-width: 900px !important;
+  font-family: Arial, sans-serif !important;
+  z-index: 9999999 !important;
+  padding-bottom: 0px !important;
+}
+
+#YDD_config_header {
+  background-color: #ff000052 !important;
+  border-radius: 10px;
+  padding: 10px !important;
+  text-align: center !important;
+  font-size: 24px !important;
+  color: blob !important;
+  font-weight: 600 !important;
+}
+
+.section_header_holder {
+  font-weight: 600;
+  margin-top: 0px !important;
+}
+
+#YDD_config_buttons_holder {
+  text-align: center;
+  margin-top: 20px;
+}
+
+#YDD_config_resetLink {
+  color: #fff !important;
+}
+
+.config_var {
+  margin: 0px !important;
+}
+
+#YDD_config_buttons_holder button {
+  background-color: #ff000052 !important;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  padding: 10px 20px !important;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#YDD_config_fieldset {
+  border: 1px solid #444;
+  padding: 10px;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+
+#YDD_config_fieldset legend {
+  color: #ff0000;
+}
+
+.section_header {
+  background: none !important;
+  width: fit-content;
+  margin: 5px 0px !important;
+  font-size: 18px !important;
+  color: #ff0000 !important;
+}
+
+input, select, textarea {
+  cursor: pointer;
+  background-color: #333;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 10px;
+  padding: 5px;
+  margin: 5px 0 !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #ff0000;
+}
+
+label {
+  color: #fff;
+}
+
+#YDD_config_buttons_holder {
+  position: relative;
+  margin-top: 0px !important;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+}
+
+.reset_holder {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 0;
+  padding: 10px;
+}
+`;
+
+const yddCSS = `
+ ydd-item {
+  cursor: pointer;
+  margin-top: 8px;
+  font-size: 1.4rem;
+  line-height: 2rem;
+  font-weight: 400;
+  position: relative;
+  color: var(--yt-spec-text-primary);
+  font-family: "Roboto","Arial",sans-serif;
+  white-space: nowrap;
+  display: flex;
+  margin-bottom: -10px;
+  padding: 10px 0 10px 21px;
+  gap: 23px;
+  align-items: center;
+  text-transform: capitalize;
+}
+
+ydd-item:hover {
+  background-color: var(--yt-spec-10-percent-layer);
+}
+
+ydd-item-icon {
+  content: '⇩';
+  font-size: 2.1rem;
+}
+
+ydd-item-text {
+  position: relative;
+}
+
+ydd-item-button {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 90%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 9999;
+}
+
+ydd-item-sidebar {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  padding: 1px;
+  color: var(--yt-spec-text-primary);
+  z-index: 9999;
+  right: 0;
+  top: 0;
+  width: 10%;
+  height: 90%;
+}
+
+#ydd-button-sub {
+  cursor: pointer;
+  font-size: 2rem;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 15px;
+  margin-left: 8px;
+  line-height: 2rem;
+  font-weight: 500;
+  color: #0f0f0f;
+  backgroundColor: #f1f1f1;
+  font-family: "Roboto","Arial",sans-serif;
+  align-items: center;
+  text-transform: capitalize;
+}
+
+#ydd-button-sub:hover {
+  filter: brightness(90%);
+}
+
+ytd-menu-popup-renderer {
+  min-height: 100px !important;
+  min-width: 133px !important;
+}
+`;
 
 GM_registerMenuCommand('Settings', opencfg);
 
@@ -33,12 +225,17 @@ const defaults = {
   subscribeButton: true,
 };
 
+let frame = document.createElement('div');
+document.body.appendChild(frame);
+
 let gmc = new GM_config({
-  id: 'config',
-  title: 'Youtube direct downloader settings',
+  id: 'YDD_config',
+  title: 'Youtube Direct Downloader - Settings',
+  css: gmcCSS,
+  frame: frame,
   fields: {
     subscribeButton: {
-      section: ['Position of download button:'],
+      section: ['Position of download button'],
       label: 'Show download button next to subscribe button:',
       labelPos: 'left',
       type: 'checkbox',
@@ -110,14 +307,14 @@ let gmc = new GM_config({
     },
     url: {
       section: ['Links'],
-      label: 'My other userscripts',
+      label: 'All my userscripts - FawayTT',
       type: 'button',
       click: () => {
         GM_openInTab('https://github.com/FawayTT/userscripts');
       },
     },
     cobaltUrl: {
-      label: 'Cobalt',
+      label: 'Cobalt github page',
       type: 'button',
       click: () => {
         GM_openInTab('https://github.com/imputnet/cobalt');
@@ -138,15 +335,6 @@ let gmc = new GM_config({
 
 function opencfg() {
   gmc.open();
-  config.style = `
-  width: 100%;
-  height: 100%;
-  max-height: 40rem;
-  max-width: 80rem;
-  border-radius: 10px;
-  z-index: 9999999;
-  position: fixed;
-  `;
 }
 
 let timeout;
@@ -239,7 +427,7 @@ function addButtonDownloadInfo(serviceName, div) {
     const vCodec = gmc.get('vCodec') || defaults.vCodec;
     if (option === 'onchange' && quality === defaults.quality && vCodec === defaults.vCodec) return;
     const qualityText = `${quality}, ${vCodec}`;
-    const downloadInfo = document.createElement('custom-dwn-button-download-info');
+    const downloadInfo = document.createElement('ydd-item-button-info');
     downloadInfo.style.cssText = `
                 position: absolute;
                 left: 0;
@@ -253,7 +441,7 @@ function addButtonDownloadInfo(serviceName, div) {
 }
 
 function deleteButton() {
-  const buttons = document.getElementsByTagName('custom-dwn-button');
+  const buttons = document.getElementsByTagName('ydd-item');
   if (buttons.length === 0) return;
   const button = buttons[0];
   button.remove();
@@ -283,97 +471,54 @@ function addMenu(hidden) {
   }
 }
 
+const addStyles = () => {
+  const style = document.createElement('style');
+  style.type = 'text/css';
+  style.innerHTML = yddCSS;
+  document.head.appendChild(style);
+};
+
 function createButton() {
   addMenu();
-  if (document.getElementsByTagName('custom-dwn-button').length !== 0) return;
+  if (document.getElementsByTagName('ydd-item').length !== 0) return;
   const serviceName = gmc.get('downloadService') || defaults.downloadService;
   const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
-  const downButtonOuter = document.createElement('custom-dwn-button');
-  const icon = document.createElement('div');
-  const text = document.createElement('custom-dwn-button-text');
-  const downButton = document.createElement('button');
-  const extra = document.createElement('div');
-  const settings = document.createElement('div');
-  const downAudioOnly = document.createElement('div');
-  menu.style.minHeight = '100px';
-  menu.style.minWidth = '133px';
-  text.style.position = 'relative';
-  downButtonOuter.style.cssText = `
-          cursor: pointer;
-          margin-top: 8px;
-          font-size: 1.4rem;
-          line-height: 2rem;
-          font-weight: 400;
-          position: relative;
-          color: var(--yt-spec-text-primary);
-          font-family: "Roboto","Arial",sans-serif;
-          white-space: nowrap;
-          display: flex;
-          margin-bottom: -10px;
-          padding: 10px 0 10px 21px;
-          gap: 23px;
-          align-items: center;
-          text-transform: capitalize`;
-  downButton.style.cssText = `
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 90%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
-            z-index: 9999;`;
-  extra.style.cssText = `
-            position: absolute;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
-            padding: 1px;
-            color: var(--yt-spec-text-primary);
-            z-index: 9999;
-            right: 0;
-            top: 0;
-            width: 10%;
-            height: 90%;`;
-  icon.style.cssText = `
-            font-size: 2.1rem;`;
-  icon.innerText = '⇩';
+  const item = document.createElement('ydd-item');
+  const icon = document.createElement('ydd-item-icon');
+  const text = document.createElement('ydd-item-text');
+  const download = document.createElement('ydd-item-button');
+  const sidebar = document.createElement('ydd-item-sidebar');
+  const settings = document.createElement('ydd-item-settings');
+  const downloadAudio = document.createElement('ydd-item-audio-download');
   text.innerText = serviceName;
+  icon.innerText = '⇩';
   settings.innerText = '☰';
-  downAudioOnly.innerText = '▶';
+  downloadAudio.innerText = '▶';
   addButtonDownloadInfo(serviceName, text);
-  downAudioOnly.title = `Download audio only`;
+  downloadAudio.title = `Download audio only`;
   settings.title = 'Settings';
-  downButtonOuter.appendChild(icon);
-  downButtonOuter.appendChild(text);
-  downButtonOuter.appendChild(extra);
-  downButtonOuter.appendChild(downButton);
-  extra.appendChild(settings);
-  extra.appendChild(downAudioOnly);
-  downButton.addEventListener('click', () => {
+  item.appendChild(icon);
+  item.appendChild(text);
+  item.appendChild(download);
+  item.appendChild(sidebar);
+  sidebar.appendChild(settings);
+  sidebar.appendChild(downloadAudio);
+
+  download.addEventListener('click', () => {
     download();
-    downButtonOuter.style.backgroundColor = '';
   });
 
-  downAudioOnly.addEventListener('click', () => {
+  downloadAudio.addEventListener('click', () => {
     download(true);
-    downButtonOuter.style.backgroundColor = '';
   });
+
   settings.addEventListener('click', opencfg);
-  downButtonOuter.addEventListener('mouseenter', () => {
-    downButtonOuter.style.backgroundColor = 'var(--yt-spec-10-percent-layer)';
-  });
-  downButtonOuter.addEventListener('mouseleave', () => {
-    downButtonOuter.style.backgroundColor = '';
-  });
-  menu.insertBefore(downButtonOuter, menu.firstChild);
+
+  menu.insertBefore(item, menu.firstChild);
 }
 
 function deleteSubscribeButton() {
-  const button = document.getElementById('custom-dwn-button-sub');
+  const button = document.getElementById('ydd-item-sub');
   if (!button) return;
   button.remove();
 }
@@ -381,28 +526,13 @@ function deleteSubscribeButton() {
 function createSubscribeButton() {
   if (!gmc.get('subscribeButton')) return;
   const ownerBar = document.getElementById('owner');
-  if (!ownerBar || document.getElementById('custom-dwn-button-sub')) return;
-  const downButton = document.createElement('button');
-  downButton.id = 'custom-dwn-button-sub';
-  downButton.style.cssText = `
-          cursor: pointer;
-          font-size: 2rem;
-          padding: 8px 12px;
-          border: none;
-          border-radius: 15px;
-          margin-left: 8px;
-          line-height: 2rem;
-          font-weight: 500;
-          color: #0f0f0f;
-          backgroundColor: #f1f1f1;
-          font-family: "Roboto","Arial",sans-serif;
-          align-items: center;
-          text-transform: capitalize;`;
-  ownerBar.style.position = 'relative';
-  ownerBar.appendChild(downButton);
-  downButton.title = 'Download via ' + gmc.get('downloadService');
-  downButton.innerText = '⇩';
-  downButton.addEventListener('click', () => {
+  if (!ownerBar || document.getElementById('ydd-button-sub')) return;
+  const button = document.createElement('button');
+  button.id = 'ydd-button-sub';
+  ownerBar.appendChild(button);
+  button.title = 'Download via ' + gmc.get('downloadService');
+  button.innerText = '⇩';
+  button.addEventListener('click', () => {
     download();
   });
 }
@@ -459,6 +589,7 @@ function checkShort() {
 function onInit() {
   const bodyList = document.querySelector('body');
   checkShort();
+  addStyles();
   modifyMenu();
   const observer = new MutationObserver(function (mutations) {
     mutations.forEach(function (mutation) {
