@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube Direct Downloader
-// @version             2.2.0
+// @version             2.2.1
 // @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -284,7 +284,7 @@ let gmc = new GM_config({
       label: 'Filename pattern:',
       type: 'select',
       default: defaults.filenamePattern,
-      options: ['classic', 'pretty', 'basic', 'nerdy', 'opus'],
+      options: ['classic', 'pretty', 'basic', 'nerdy'],
     },
     buttonDownloadInfo: {
       label: 'Show quality info below button:',
