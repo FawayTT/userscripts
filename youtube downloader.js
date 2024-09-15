@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube Direct Downloader
-// @version             2.1.5
+// @version             2.1.6
 // @description         Video/short download button hidden in three dots combo menu below video. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -30,6 +30,7 @@ const defaults = {
   disableMetadata: false,
   redirectShorts: false,
   backupProvider: 'y2mate',
+  subscribeButton: true,
 };
 
 const providers = ['cobalt', 'y2mate', 'yt1s'];
@@ -38,6 +39,13 @@ let gmc = new GM_config({
   id: 'config',
   title: 'Youtube direct downloader settings',
   fields: {
+    subscribeButton: {
+      section: ['Position of download button:'],
+      label: 'Show download button next to subscribe button:',
+      labelPos: 'left',
+      type: 'checkbox',
+      default: defaults.subscribeButton,
+    },
     downloadService: {
       section: ['Download method (use cobalt for best quality):'],
       label: 'Service',
@@ -90,7 +98,7 @@ let gmc = new GM_config({
       options: ['always', 'onchange', 'never'],
     },
     backupProvider: {
-      label: 'Pick backup provider in case Cobalt is not responding:',
+      label: 'Backup provider in case Cobalt is not responding:',
       type: 'select',
       default: defaults.backupProvider,
       options: ['y2mate', 'yt1s', 'none'],
@@ -123,6 +131,8 @@ let gmc = new GM_config({
       gmc.close();
       deleteButton();
       createButton();
+      deleteSubscribeButton();
+      createSubscribeButton();
     },
     init: onInit,
   },
@@ -245,8 +255,9 @@ function addButtonDownloadInfo(serviceName, div) {
 }
 
 function deleteButton() {
-  if (document.getElementsByTagName('custom-dwn-button').length === 0) return;
-  const button = document.getElementsByTagName('custom-dwn-button')[0];
+  const buttons = document.getElementsByTagName('custom-dwn-button');
+  if (buttons.length === 0) return;
+  const button = buttons[0];
   button.remove();
 }
 
@@ -363,6 +374,41 @@ function createButton() {
   menu.insertBefore(downButtonOuter, menu.firstChild);
 }
 
+function deleteSubscribeButton() {
+  const button = document.getElementById('custom-dwn-button-sub');
+  if (!button) return;
+  button.remove();
+}
+
+function createSubscribeButton() {
+  if (!gmc.get('subscribeButton')) return;
+  const ownerBar = document.getElementById('owner');
+  if (!ownerBar) return;
+  const downButton = document.createElement('button');
+  downButton.id = 'custom-dwn-button-sub';
+  downButton.style.cssText = `
+          cursor: pointer;
+          font-size: 2rem;
+          padding: 8px 12px;
+          border: none;
+          border-radius: 15px;
+          margin-left: 8px;
+          line-height: 2rem;
+          font-weight: 500;
+          color: #0f0f0f;
+          backgroundColor: #f1f1f1;
+          font-family: "Roboto","Arial",sans-serif;
+          align-items: center;
+          text-transform: capitalize;`;
+  ownerBar.style.position = 'relative';
+  ownerBar.appendChild(downButton);
+  downButton.title = 'Download via ' + gmc.get('downloadService');
+  downButton.innerText = '⇩';
+  downButton.addEventListener('click', () => {
+    download();
+  });
+}
+
 function watchMenu() {
   menuIndex += 1;
   menuOuter = null;
@@ -386,6 +432,7 @@ function watchMenu() {
   }
   const topRow = document.getElementById('top-row');
   const menuBtn = topRow.querySelector('#button-shape');
+  createSubscribeButton();
   if (!topRow || !menuBtn) {
     timeout = setTimeout(() => {
       watchMenu();
