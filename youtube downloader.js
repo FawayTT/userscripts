@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube Direct Downloader
-// @version             2.2.4
+// @version             2.3.1
 // @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -15,6 +15,8 @@
 // @grant               GM_openInTab
 // @grant               GM_xmlhttpRequest
 // @license             MIT
+// @downloadURL https://update.greasyfork.org/scripts/481954/Youtube%20Direct%20Downloader.user.js
+// @updateURL https://update.greasyfork.org/scripts/481954/Youtube%20Direct%20Downloader.meta.js
 // ==/UserScript==
 
 const gmcCSS = `
@@ -69,7 +71,7 @@ const gmcCSS = `
   padding: 10px 20px !important;
   border-radius: 10px;
   font-size: 14px;
-  cursor: pointer;  
+  cursor: pointer;
   transition: background-color 0.3s ease-in;
 }
 
@@ -111,7 +113,7 @@ input, select, textarea {
   color: white;
   background: #ff0000;
 }
-  
+
 input, select, textarea {
   transition: all 0.1s ease-in;
 }
@@ -247,7 +249,7 @@ ydd-item-sidebar {
   line-height: 2rem;
   font-weight: 500;
   color: #0f0f0f;
-  backgroundColor: #f1f1f1;
+  background-color: #f1f1f1;
   font-family: "Roboto","Arial",sans-serif;
   align-items: center;
   text-transform: capitalize;
@@ -391,13 +393,11 @@ function opencfg() {
   gmc.open();
 }
 
-let timeout;
 let menuOuter;
 let menuParent;
 let nextSibling;
 let oldHref = document.location.href;
-let menuIndex = 1;
-const menuMaxTries = 10;
+let yddAdded = false;
 
 function getYouTubeVideoID(url) {
   const urlParams = new URLSearchParams(new URL(url).search);
@@ -511,17 +511,14 @@ function hideMenu() {
   menuOuter.remove();
 }
 
-function addMenu(hidden) {
+function addMenu() {
   if (menuOuter && menuParent) {
     if (nextSibling) {
       menuParent.insertBefore(menuOuter, nextSibling); // Re-insert before the next sibling if it exists
     } else {
       menuParent.appendChild(menuOuter); // Append if it's the last child
     }
-    if (hidden) menuOuter.style.display = 'none';
-    menuOuter = null;
-    menuParent = null;
-    nextSibling = null;
+    menuOuter.style.display = 'none';
   }
 }
 
@@ -533,7 +530,6 @@ const addStyles = () => {
 };
 
 function createButton() {
-  addMenu();
   if (document.getElementsByTagName('ydd-item').length !== 0) return;
   const serviceName = gmc.get('downloadService') || defaults.downloadService;
   const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
@@ -591,71 +587,48 @@ function createSubscribeButton() {
   });
 }
 
-function watchMenu() {
-  menuIndex += 1;
+function checkShort() {
+  if (document.location.href.indexOf('youtube.com/shorts') > -1) {
+    if (gmc.get('redirectShorts')) window.location.replace(window.location.toString().replace('/shorts/', '/watch?v='));
+    return true;
+  } else return false;
+}
+
+function modifyMenu() {
+  const short = checkShort();
+  if (document.location.href.indexOf('youtube.com/watch') === -1 && !short) {
+    yddAdded = true;
+    return;
+  }
+  addMenu();
   menuOuter = null;
   menuParent = null;
   nextSibling = null;
-  if (menuMaxTries < menuIndex) {
-    menuIndex = 1;
-    clearTimeout(timeout);
-    return;
-  }
-  if (document.location.href.indexOf('youtube.com/shorts') > -1) {
+  if (short) {
     const menuBtn = document.getElementById('menu-button');
-    if (!menuBtn) {
-      timeout = setTimeout(watchMenu, 500 * menuIndex);
-      return;
-    }
+    if (!menuBtn) return;
+    yddAdded = true;
     menuBtn.addEventListener('click', createButton);
-    menuIndex = 1;
-    clearTimeout(timeout);
     return;
   }
   const topRow = document.getElementById('top-row');
   const menuBtn = topRow.querySelector('#button-shape');
   createSubscribeButton();
-  if (!topRow || !menuBtn) {
-    timeout = setTimeout(() => {
-      watchMenu();
-    }, 500 * menuIndex);
-    return;
-  }
+  if (!topRow || !menuBtn) return;
+  yddAdded = true;
   menuBtn.addEventListener('click', createButton);
-  menuIndex = 1;
-  clearTimeout(timeout);
-}
-
-function modifyMenu() {
-  if (document.location.href.indexOf('youtube.com/watch') === -1 && document.location.href.indexOf('youtube.com/shorts') === -1) return;
-  if (document.hidden) {
-    window.addEventListener('visibilitychange', () => {
-      if (document.hidden) return;
-      timeout = setTimeout(watchMenu, 500 * menuIndex);
-    });
-  } else timeout = setTimeout(watchMenu, 500 * menuIndex);
-}
-
-function checkShort() {
-  if (document.location.href.indexOf('youtube.com/shorts') > -1 && gmc.get('redirectShorts')) window.location.replace(window.location.toString().replace('/shorts/', '/watch?v='));
 }
 
 function onInit() {
-  const bodyList = document.querySelector('body');
-  checkShort();
   addStyles();
-  modifyMenu();
-  const observer = new MutationObserver(function (mutations) {
-    mutations.forEach(function (mutation) {
-      if (oldHref != document.location.href) {
-        checkShort();
-        oldHref = document.location.href;
-        addMenu(true);
-        modifyMenu();
-      }
-    });
+  const observer = new MutationObserver(function () {
+    if (!yddAdded) return modifyMenu();
+    if (oldHref != document.location.href) {
+      oldHref = document.location.href;
+      yddAdded = false;
+    }
   });
-  observer.observe(bodyList, {
+  observer.observe(document.body, {
     childList: true,
     subtree: true,
   });
