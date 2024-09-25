@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                Youtube Direct Downloader
-// @version             2.2.1
+// @version             2.2.3
 // @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -24,6 +24,8 @@ const gmcCSS = `
   color: #fff !important;
   border-radius: 30px !important;
   padding: 20px !important;
+  height: fit-content !important;
+  max-height: 95vh !important;
   max-width: 900px !important;
   font-family: Arial, sans-serif !important;
   z-index: 9999999 !important;
@@ -42,7 +44,7 @@ const gmcCSS = `
 
 .section_header_holder {
   font-weight: 600;
-  margin-top: 0px !important;
+  margin-top: 10px !important;
 }
 
 #YDD_config_buttons_holder {
@@ -56,6 +58,7 @@ const gmcCSS = `
 
 .config_var {
   margin: 0px !important;
+  line-height: 3;
 }
 
 #YDD_config_buttons_holder button {
@@ -66,7 +69,12 @@ const gmcCSS = `
   padding: 10px 20px !important;
   border-radius: 10px;
   font-size: 14px;
-  cursor: pointer;
+  cursor: pointer;  
+  transition: background-color 0.3s ease-in;
+}
+
+#YDD_config_buttons_holder button:hover {
+  background-color: #ff0000 !important;
 }
 
 #YDD_config_fieldset {
@@ -84,6 +92,7 @@ const gmcCSS = `
   background: none !important;
   width: fit-content;
   margin: 5px 0px !important;
+  border: none !important;
   font-size: 18px !important;
   color: #ff0000 !important;
 }
@@ -98,8 +107,21 @@ input, select, textarea {
   margin: 5px 0 !important;
 }
 
+::selection {
+  color: white;
+  background: #ff0000;
+}
+  
+input, select, textarea {
+  transition: all 0.1s ease-in;
+}
+
 input:focus, select:focus, textarea:focus {
   border-color: #ff0000;
+}
+
+input:hover, select:hover, textarea:hover {
+  opacity: 0.8;
 }
 
 label {
@@ -120,6 +142,38 @@ label {
   transform: translateY(-50%);
   right: 0;
   padding: 10px;
+}
+
+input[type='checkbox'] {
+  appearance: none;
+  position: absolute;
+  width: 20px;
+  transform: translateY(3px);
+  height: 20px;
+  border: 1px solid #555;
+  border-radius: 10px;
+  background-color: #333;
+  cursor: pointer;
+}
+
+input[type='checkbox']:before {
+  content: " ";
+}
+
+input[type='checkbox']:checked {
+  background-color: #d50707;
+}
+
+input[type='checkbox']:checked::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 2px;
+  width: 12px;
+  height: 6px;
+  border-bottom: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  transform: rotate(-45deg);
 }
 `;
 
@@ -243,7 +297,7 @@ let gmc = new GM_config({
     },
     downloadService: {
       section: ['Download method (use cobalt for best quality)'],
-      label: 'Service',
+      label: 'Service:',
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
@@ -486,29 +540,29 @@ function createButton() {
   const item = document.createElement('ydd-item');
   const icon = document.createElement('ydd-item-icon');
   const text = document.createElement('ydd-item-text');
-  const download = document.createElement('ydd-item-button');
+  const button = document.createElement('ydd-item-button');
   const sidebar = document.createElement('ydd-item-sidebar');
   const settings = document.createElement('ydd-item-settings');
-  const downloadAudio = document.createElement('ydd-item-audio-download');
+  const audioButton = document.createElement('ydd-item-audio-download');
   text.innerText = serviceName;
   icon.innerText = '⇩';
   settings.innerText = '☰';
-  downloadAudio.innerText = '▶';
+  audioButton.innerText = '▶';
   addButtonDownloadInfo(serviceName, text);
-  downloadAudio.title = `Download audio only`;
+  audioButton.title = `Download audio only`;
   settings.title = 'Settings';
   item.appendChild(icon);
   item.appendChild(text);
-  item.appendChild(download);
+  item.appendChild(button);
   item.appendChild(sidebar);
   sidebar.appendChild(settings);
-  sidebar.appendChild(downloadAudio);
+  sidebar.appendChild(audioButton);
 
-  download.addEventListener('click', () => {
+  button.addEventListener('click', () => {
     download();
   });
 
-  downloadAudio.addEventListener('click', () => {
+  audioButton.addEventListener('click', () => {
     download(true);
   });
 
