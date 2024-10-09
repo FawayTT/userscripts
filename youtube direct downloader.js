@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             2.4.0
+// @version             2.4.1
 // @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -15,8 +15,6 @@
 // @grant               GM_openInTab
 // @grant               GM_xmlhttpRequest
 // @license             MIT
-// @downloadURL https://update.greasyfork.org/scripts/481954/YouTube%20Direct%20Downloader.user.js
-// @updateURL https://update.greasyfork.org/scripts/481954/YouTube%20Direct%20Downloader.meta.js
 // ==/UserScript==
 
 const gmcCSS = `
@@ -430,6 +428,12 @@ let oldHref = document.location.href;
 let yddAdded = false;
 
 function getYouTubeVideoID(url) {
+  if (url.includes('shorts')) {
+    const regex = /\/shorts\/([^/?]+)/;
+    const match = url.match(regex);
+    const id = match ? match[1] : null;
+    return id;
+  }
   const urlParams = new URLSearchParams(new URL(url).search);
   return urlParams.get('v');
 }
