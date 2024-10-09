@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             2.3.3
+// @version             2.4.0
 // @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -27,11 +27,11 @@ const gmcCSS = `
   border-radius: 30px !important;
   padding: 20px !important;
   height: fit-content !important;
-  max-height: 95vh !important;
-  max-width: 900px !important;
+  max-width: 700px !important;
   font-family: Arial, sans-serif !important;
   z-index: 9999999 !important;
   padding-bottom: 0px !important;
+  width: 100% !important;
 }
 
 #YDD_config_header {
@@ -72,7 +72,7 @@ const gmcCSS = `
   border-radius: 10px;
   font-size: 14px;
   cursor: pointer;
-  transition: background-color 0.3s ease-in;
+  transition: background-color 0.1s ease-in;
 }
 
 #YDD_config_buttons_holder button:hover {
@@ -177,6 +177,36 @@ input[type='checkbox']:checked::after {
   border-left: 2px solid #ffffff;
   transform: rotate(-45deg);
 }
+  
+#YDD_config_downloadService_var:after {
+  content: "▲ Use cobalt for best quality.";
+  display: block;
+  font-family: arial, tahoma, myriad pro, sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  margin-right: 6px;
+  opacity: 0.7;
+}
+
+#YDD_config_vCodec_var:after {
+  content: "▲ H264 [MP4] = best compatibility. VP9 [WEBM] = better quality. AV1 = best quality but is used only by few videos.";
+  display: block;
+  font-family: arial, tahoma, myriad pro, sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  margin-right: 6px;
+  opacity: 0.7;
+}
+
+#YDD_config_backupService_var:after {
+  content: "▲ In case Cobalt isn't working, automatically use this download service.";
+  display: block;
+  font-family: arial, tahoma, myriad pro, sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  margin-right: 6px;
+  opacity: 0.7;
+}
 `;
 
 const yddCSS = `
@@ -268,7 +298,7 @@ ytd-menu-popup-renderer {
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
-  downloadService: 'cobalt',
+  downloadService: 'auto',
   quality: 'max',
   vCodec: 'vp9',
   aFormat: 'mp3',
@@ -277,7 +307,7 @@ const defaults = {
   isAudioMuted: false,
   disableMetadata: false,
   redirectShorts: false,
-  backupProvider: 'y2mate',
+  backupService: 'y2mate',
   subscribeButton: true,
 };
 
@@ -286,7 +316,7 @@ document.body.appendChild(frame);
 
 let gmc = new GM_config({
   id: 'YDD_config',
-  title: 'YouTube Direct Downloader - Settings',
+  title: 'YouTube Direct Downloader (YDD) - Settings',
   css: gmcCSS,
   frame: frame,
   fields: {
@@ -298,12 +328,12 @@ let gmc = new GM_config({
       default: defaults.subscribeButton,
     },
     downloadService: {
-      section: ['Download method (use cobalt for best quality)'],
+      section: ['Download method'],
       label: 'Service:',
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['cobalt', 'y2mate', 'yt1s'],
+      options: ['auto', 'cobalt', 'y2mate', 'yt1s'],
     },
     quality: {
       section: ['Cobalt-only settings'],
@@ -314,7 +344,7 @@ let gmc = new GM_config({
       options: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
     },
     vCodec: {
-      label: 'Video codec (h264 [MP4] for best compatibility, vp9 [WEBM] for better quality. AV1 = best quality but is used only by few videos):',
+      label: 'Video codec:',
       labelPos: 'left',
       type: 'select',
       default: defaults.vCodec,
@@ -348,10 +378,10 @@ let gmc = new GM_config({
       default: defaults.buttonDownloadInfo,
       options: ['always', 'onchange', 'never'],
     },
-    backupProvider: {
-      label: 'Backup provider in case Cobalt is not responding:',
+    backupService: {
+      label: 'Backup service:',
       type: 'select',
-      default: defaults.backupProvider,
+      default: defaults.backupService,
       options: ['y2mate', 'yt1s', 'none'],
     },
     redirectShorts: {
@@ -405,12 +435,16 @@ function getYouTubeVideoID(url) {
 }
 
 function handleCobaltError(errorMessage, isAudioOnly) {
+  const backupService = gmc.get('backupService') || 'y2mate';
+  if (gmc.get('downloadService') === 'auto') {
+    download(isAudioOnly, 'y2mate');
+    return;
+  }
   let alertText = 'Cobalt error: ' + (errorMessage || 'Something went wrong! Try again later.');
-  const backupProvider = gmc.get('backupProvider') || 'y2mate';
-  if (backupProvider !== 'none') {
-    alertText += '\n\nYou will be redirected to backup provider ' + backupProvider + '.';
+  if (backupService !== 'none') {
+    alertText += '\n\nYou will be redirected to backup provider ' + backupService + '.';
     alert(alertText);
-    download(isAudioOnly, backupProvider);
+    download(isAudioOnly, backupService);
   } else alert(alertText);
 }
 
@@ -425,7 +459,7 @@ function download(isAudioOnly, downloadService) {
       if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
       break;
-    case 'cobalt':
+    default:
       GM_xmlhttpRequest({
         method: 'POST',
         url: 'https://api.cobalt.tools/api/json',
@@ -450,7 +484,7 @@ function download(isAudioOnly, downloadService) {
             else handleCobaltError(data.text, isAudioOnly);
           } catch (error) {
             handleCobaltError(null, isAudioOnly);
-            console.error(error);
+            if (downloadService !== 'auto') console.error(error);
           }
         },
         onerror: function (error) {
@@ -462,8 +496,6 @@ function download(isAudioOnly, downloadService) {
           handleCobaltError(alertText, isAudioOnly);
         },
       });
-      break;
-    default:
       break;
   }
   hideMenu();
@@ -537,7 +569,7 @@ function createButton() {
   const sidebar = document.createElement('ydd-item-sidebar');
   const settings = document.createElement('ydd-item-settings');
   const audioButton = document.createElement('ydd-item-audio-download');
-  text.innerText = serviceName;
+  text.innerText = serviceName === 'auto' ? 'YDD' : serviceName;
   icon.innerText = '⇩';
   settings.innerText = '☰';
   audioButton.innerText = '▶';
@@ -577,7 +609,10 @@ function createSubscribeButton() {
   const button = document.createElement('button');
   button.id = 'ydd-button-sub';
   ownerBar.appendChild(button);
-  button.title = 'Download via ' + gmc.get('downloadService');
+  let downloadService = gmc.get('downloadService') || defaults.downloadService;
+  if (downloadService === 'auto') {
+    button.title = 'Download with YDD';
+  } else button.title = 'Download via ' + downloadService;
   button.innerText = '⇩';
   button.addEventListener('click', () => {
     download();
