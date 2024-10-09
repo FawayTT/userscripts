@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             2.3.2
+// @version             2.3.3
 // @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -15,6 +15,8 @@
 // @grant               GM_openInTab
 // @grant               GM_xmlhttpRequest
 // @license             MIT
+// @downloadURL https://update.greasyfork.org/scripts/481954/YouTube%20Direct%20Downloader.user.js
+// @updateURL https://update.greasyfork.org/scripts/481954/YouTube%20Direct%20Downloader.meta.js
 // ==/UserScript==
 
 const gmcCSS = `
@@ -402,6 +404,16 @@ function getYouTubeVideoID(url) {
   return urlParams.get('v');
 }
 
+function handleCobaltError(errorMessage, isAudioOnly) {
+  let alertText = 'Cobalt error: ' + (errorMessage || 'Something went wrong! Try again later.');
+  const backupProvider = gmc.get('backupProvider') || 'y2mate';
+  if (backupProvider !== 'none') {
+    alertText += '\n\nYou will be redirected to backup provider ' + backupProvider + '.';
+    alert(alertText);
+    download(isAudioOnly, backupProvider);
+  } else alert(alertText);
+}
+
 function download(isAudioOnly, downloadService) {
   if (!downloadService) downloadService = gmc.get('downloadService');
   switch (downloadService) {
@@ -432,36 +444,22 @@ function download(isAudioOnly, downloadService) {
           isAudioOnly: isAudioOnly,
         }),
         onload: (response) => {
-          const data = JSON.parse(response.responseText);
-          if (data.url) window.open(data.url);
-          else {
-            let alertText = 'Cobalt error: ' + data.text || 'Something went wrong! Try again later.';
-            const backupProvider = gmc.get('backupProvider');
-            if (backupProvider !== 'none') {
-              alertText += '\n\nYou will be redirected to backup provider ' + backupProvider + '.';
-              alert(alertText);
-              download(isAudioOnly, backupProvider);
-            } else alert(alertText);
+          try {
+            const data = JSON.parse(response.responseText);
+            if (data.url) window.open(data.url);
+            else handleCobaltError(data.text, isAudioOnly);
+          } catch (error) {
+            handleCobaltError(null, isAudioOnly);
+            console.error(error);
           }
         },
         onerror: function (error) {
           const errorMessage = error.message || error;
-          let alertText = 'Cobalt error occurred: ' + errorMessage;
-          const backupProvider = gmc.get('backupProvider');
-          if (backupProvider !== 'none') {
-            alertText += '\n\nYou will be redirected to backup provider ' + backupProvider + '.';
-            alert(alertText);
-            download(isAudioOnly, backupProvider);
-          } else alert(alertText);
+          handleCobaltError(errorMessage, isAudioOnly);
         },
         ontimeout: function () {
-          let alertText = 'Cobalt is not responding. Please try again later.';
-          const backupProvider = gmc.get('backupProvider');
-          if (backupProvider !== 'none') {
-            alertText += '\n\nYou will be redirected to backup provider ' + backupProvider + '.';
-            alert(alertText);
-            download(isAudioOnly, backupProvider);
-          } else alert(alertText);
+          const alertText = 'Cobalt is not responding. Please try again later.';
+          handleCobaltError(alertText, isAudioOnly);
         },
       });
       break;
