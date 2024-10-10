@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             2.4.1
+// @version             2.4.2
 // @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -175,7 +175,7 @@ input[type='checkbox']:checked::after {
   border-left: 2px solid #ffffff;
   transform: rotate(-45deg);
 }
-  
+
 #YDD_config_downloadService_var:after {
   content: "▲ Use cobalt for best quality.";
   display: block;
@@ -426,6 +426,23 @@ let menuParent;
 let nextSibling;
 let oldHref = document.location.href;
 let yddAdded = false;
+let dError;
+let dTimeout;
+
+function getHeaders() {
+  const userAgent = navigator.userAgent;
+  const refererHeader = window.location.href;
+  const originHeader = window.location.origin;
+  const languages = navigator.languages;
+  return {
+    'User-Agent': userAgent,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    'Accept-Language': languages,
+    Referer: refererHeader,
+    Origin: originHeader,
+  };
+}
 
 function getYouTubeVideoID(url) {
   if (url.includes('shorts')) {
@@ -441,7 +458,7 @@ function getYouTubeVideoID(url) {
 function handleCobaltError(errorMessage, isAudioOnly) {
   const backupService = gmc.get('backupService') || 'y2mate';
   if (gmc.get('downloadService') === 'auto') {
-    download(isAudioOnly, 'y2mate');
+    download(isAudioOnly, backupService);
     return;
   }
   let alertText = 'Cobalt error: ' + (errorMessage || 'Something went wrong! Try again later.');
@@ -464,13 +481,11 @@ function download(isAudioOnly, downloadService) {
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
       break;
     default:
+      if (dError) return handleCobaltError(dError, isAudioOnly);
       GM_xmlhttpRequest({
         method: 'POST',
         url: 'https://api.cobalt.tools/api/json',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: getHeaders(),
         data: JSON.stringify({
           url: encodeURI(document.location.href),
           vQuality: gmc.get('quality'),
@@ -500,6 +515,11 @@ function download(isAudioOnly, downloadService) {
           handleCobaltError(alertText, isAudioOnly);
         },
       });
+      clearTimeout(dTimeout);
+      dError = 'Slow down.';
+      dTimeout = setTimeout(() => {
+        dError = null;
+      }, 5000);
       break;
   }
   hideMenu();
@@ -546,9 +566,9 @@ function hideMenu() {
 function addMenu() {
   if (menuOuter && menuParent) {
     if (nextSibling) {
-      menuParent.insertBefore(menuOuter, nextSibling); // Re-insert before the next sibling if it exists
+      menuParent.insertBefore(menuOuter, nextSibling);
     } else {
-      menuParent.appendChild(menuOuter); // Append if it's the last child
+      menuParent.appendChild(menuOuter);
     }
     menuOuter.style.display = 'none';
   }
