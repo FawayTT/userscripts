@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             2.4.2
-// @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM or MP3 from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
+// @version             2.5.0
+// @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, u2convert) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @supportURL          https://github.com/FawayTT/userscripts/issues
@@ -307,6 +307,7 @@ const defaults = {
   redirectShorts: false,
   backupService: 'y2mate',
   subscribeButton: true,
+  subsDownload: true,
 };
 
 let frame = document.createElement('div');
@@ -331,7 +332,7 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['auto', 'cobalt', 'y2mate', 'yt1s'],
+      options: ['auto', 'cobalt', 'y2mate', 'yt1s', 'u2convert'],
     },
     quality: {
       section: ['Cobalt-only settings'],
@@ -380,7 +381,7 @@ let gmc = new GM_config({
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: ['y2mate', 'yt1s', 'none'],
+      options: ['y2mate', 'yt1s', 'u2convert', 'none'],
     },
     redirectShorts: {
       section: ['Extra features'],
@@ -388,6 +389,12 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'checkbox',
       default: defaults.redirectShorts,
+    },
+    subsDownload: {
+      label: 'Right click on audio button downloads subtitles:',
+      labelPos: 'left',
+      type: 'checkbox',
+      default: defaults.subsDownload,
     },
     url: {
       section: ['Links'],
@@ -428,6 +435,7 @@ let oldHref = document.location.href;
 let yddAdded = false;
 let dError;
 let dTimeout;
+let yddItem;
 
 function getHeaders() {
   const userAgent = navigator.userAgent;
@@ -479,6 +487,10 @@ function download(isAudioOnly, downloadService) {
     case 'yt1s':
       if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
+      break;
+    case 'u2convert':
+      if (isAudioOnly) window.open(`https://u2convert.com/mp3-download/${getYouTubeVideoID(document.location.href)}`);
+      else window.open(`https://u2convert.com/download/${getYouTubeVideoID(document.location.href)}`);
       break;
     default:
       if (dError) return handleCobaltError(dError, isAudioOnly);
@@ -581,12 +593,22 @@ const addStyles = () => {
   document.head.appendChild(style);
 };
 
+function removeButton(e) {
+  const menus = document.getElementsByTagName('tp-yt-iron-dropdown');
+  const menu = Array.from(menus).find((el) => !el.matches('#dropdown'));
+  if (menu && menu.style.display !== 'none' && !menu.contains(e.target) && yddItem) {
+    yddItem.remove();
+    yddItem = null;
+    window.removeEventListener('click', removeButton);
+  }
+}
+
 function createButton() {
   addMenu();
-  if (document.getElementsByTagName('ydd-item').length !== 0) return;
+  if (yddItem) return;
   const serviceName = gmc.get('downloadService') || defaults.downloadService;
   const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
-  const item = document.createElement('ydd-item');
+  yddItem = document.createElement('ydd-item');
   const icon = document.createElement('ydd-item-icon');
   const text = document.createElement('ydd-item-text');
   const button = document.createElement('ydd-item-button');
@@ -600,10 +622,10 @@ function createButton() {
   addButtonDownloadInfo(serviceName, text);
   audioButton.title = `Download audio only`;
   settings.title = 'Settings';
-  item.appendChild(icon);
-  item.appendChild(text);
-  item.appendChild(button);
-  item.appendChild(sidebar);
+  yddItem.appendChild(icon);
+  yddItem.appendChild(text);
+  yddItem.appendChild(button);
+  yddItem.appendChild(sidebar);
   sidebar.appendChild(settings);
   sidebar.appendChild(audioButton);
 
@@ -615,9 +637,14 @@ function createButton() {
     download(true);
   });
 
-  settings.addEventListener('click', opencfg);
+  if (gmc.get('subsDownload'))
+    audioButton.addEventListener('contextmenu', () => {
+      window.open(`https://downsub.com/?url=${document.location.href}`);
+    });
 
-  menu.insertBefore(item, menu.firstChild);
+  settings.addEventListener('click', opencfg);
+  menu.insertBefore(yddItem, menu.firstChild);
+  if (!checkShort(false)) window.addEventListener('click', removeButton);
 }
 
 function deleteSubscribeButton() {
@@ -643,15 +670,19 @@ function createSubscribeButton() {
   });
 }
 
-function checkShort() {
+function checkShort(replace = true) {
   if (document.location.href.indexOf('youtube.com/shorts') > -1) {
-    if (gmc.get('redirectShorts')) window.location.replace(window.location.toString().replace('/shorts/', '/watch?v='));
+    if (gmc.get('redirectShorts') && replace) window.location.replace(window.location.toString().replace('/shorts/', '/watch?v='));
     return true;
   } else return false;
 }
 
 function modifyMenu() {
   const short = checkShort();
+  if (yddItem && !short) {
+    yddItem.remove();
+    yddItem = null;
+  }
   if (document.location.href.indexOf('youtube.com/watch') === -1 && !short) {
     yddAdded = true;
     return;
@@ -667,6 +698,7 @@ function modifyMenu() {
     menuBtn.addEventListener('click', createButton);
     return;
   }
+
   const topRow = document.getElementById('top-row');
   const menuBtn = topRow.querySelector('#button-shape');
   createSubscribeButton();
