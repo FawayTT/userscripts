@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             2.5.0
-// @description         Video/short download button hidden in three dots combo menu below video or next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, u2convert) in settings.
+// @version             3.0.0
+// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, u2convert) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @supportURL          https://github.com/FawayTT/userscripts/issues
@@ -208,72 +208,25 @@ input[type='checkbox']:checked::after {
 `;
 
 const yddCSS = `
- ydd-item {
-  cursor: pointer;
-  margin-top: 8px;
-  font-size: 1.4rem;
-  line-height: 2rem;
-  font-weight: 400;
+#ydd-button {
   position: relative;
-  color: var(--yt-spec-text-primary);
-  font-family: "Roboto","Arial",sans-serif;
-  white-space: nowrap;
   display: flex;
-  margin-bottom: -10px;
-  padding: 10px 0 10px 21px;
-  gap: 23px;
   align-items: center;
-  text-transform: capitalize;
-}
-
-ydd-item:hover {
-  background-color: var(--yt-spec-10-percent-layer);
-}
-
-ydd-item-icon {
-  content: '⇩';
-  font-size: 2.1rem;
-}
-
-ydd-item-text {
-  position: relative;
-}
-
-ydd-item-button {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 90%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 9999;
-}
-
-ydd-item-sidebar {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
   justify-content: center;
-  align-items: center;
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-  padding: 1px;
-  color: var(--yt-spec-text-primary);
-  z-index: 9999;
-  right: 0;
-  top: 0;
-  width: 10%;
-  height: 90%;
+  border-radius: 15px;
+  margin-left: 8px;
+  box-shadow: 1px 0px 7px -4px rgba(0, 0, 0, 0.8);
 }
 
-#ydd-button-sub {
+#ydd-download {
+  position: relative;
+  z-index: 10;
   cursor: pointer;
   font-size: 2rem;
   padding: 8px 12px;
   border: none;
   border-radius: 15px;
-  margin-left: 8px;
   line-height: 2rem;
   font-weight: 500;
   color: #0f0f0f;
@@ -283,13 +236,87 @@ ydd-item-sidebar {
   text-transform: capitalize;
 }
 
-#ydd-button-sub:hover {
+#ydd-download:hover {
   filter: brightness(90%);
 }
 
-ytd-menu-popup-renderer {
-  min-height: 100px !important;
-  min-width: 133px !important;
+#ydd-options {
+  line-height: 2rem;
+  font-weight: 500;
+  color: var(--yt-spec-text-primary);
+  margin: 0px 5px;
+  cursor: pointer;
+  font-family: "Roboto","Arial",sans-serif;
+  transition: all 0.1s ease-in;
+}
+
+#ydd-options:hover {
+  scale: 1.4;
+}
+
+#ydd-options-div {
+  transition: transform 0.3s ease, opacity 0.1s ease;
+  position: absolute;
+  top: 0px;
+  transform: translateY(-70%);
+  right: -18px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-radius: 15px;
+  margin-right: 8px;
+  margin-top: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  font-family: "Roboto","Arial",sans-serif;
+  font-weight: 500;
+  font-size: 1.2rem;
+  line-height: 2rem;
+  color: black;
+  align-items: start;
+  white-space: nowrap;
+}
+
+#ydd-options-div > * {
+  margin: 6px;
+  cursor: pointer;
+  transition: all 0.1s ease-in;
+}
+
+#ydd-options-div > *:hover {
+  scale: 1.1;
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0.8) translateY(-60%);
+    opacity: 0;            /* Start transparent */
+  }
+  100% {
+    transform: scale(1) translateY(-70%);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleOut {
+  0% {
+    transform: scale(1) translateY(-70%);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.8) translateY(-60%);
+    opacity: 0;
+  }
+}
+
+.ydd-scale-up {
+  animation: scaleIn 0.3s forwards;
+}
+
+.ydd-scale-down {
+  animation: scaleOut 0.3s forwards;
 }
 `;
 
@@ -301,13 +328,10 @@ const defaults = {
   vCodec: 'vp9',
   aFormat: 'mp3',
   filenamePattern: 'pretty',
-  buttonDownloadInfo: 'onchange',
   isAudioMuted: false,
   disableMetadata: false,
   redirectShorts: false,
   backupService: 'y2mate',
-  subscribeButton: true,
-  subsDownload: true,
 };
 
 let frame = document.createElement('div');
@@ -319,13 +343,6 @@ let gmc = new GM_config({
   css: gmcCSS,
   frame: frame,
   fields: {
-    subscribeButton: {
-      section: ['Position of download button'],
-      label: 'Show download button next to subscribe button:',
-      labelPos: 'left',
-      type: 'checkbox',
-      default: defaults.subscribeButton,
-    },
     downloadService: {
       section: ['Download method'],
       label: 'Service:',
@@ -371,12 +388,6 @@ let gmc = new GM_config({
       default: defaults.filenamePattern,
       options: ['classic', 'pretty', 'basic', 'nerdy'],
     },
-    buttonDownloadInfo: {
-      label: 'Show quality info below button:',
-      type: 'select',
-      default: defaults.buttonDownloadInfo,
-      options: ['always', 'onchange', 'never'],
-    },
     backupService: {
       label: 'Backup service:',
       type: 'select',
@@ -389,12 +400,6 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'checkbox',
       default: defaults.redirectShorts,
-    },
-    subsDownload: {
-      label: 'Right click on audio button downloads subtitles:',
-      labelPos: 'left',
-      type: 'checkbox',
-      default: defaults.subsDownload,
     },
     url: {
       section: ['Links'],
@@ -415,10 +420,10 @@ let gmc = new GM_config({
   events: {
     save: function () {
       gmc.close();
-      deleteButton();
-      createButton();
-      deleteSubscribeButton();
-      createSubscribeButton();
+      deleteButtons();
+      const bar = document.getElementById('owner');
+      if (!bar) return;
+      createButton(bar, checkShort(false));
     },
     init: onInit,
   },
@@ -428,14 +433,10 @@ function opencfg() {
   gmc.open();
 }
 
-let menuOuter;
-let menuParent;
-let nextSibling;
 let oldHref = document.location.href;
 let yddAdded = false;
 let dError;
 let dTimeout;
-let yddItem;
 
 function getHeaders() {
   const userAgent = navigator.userAgent;
@@ -534,139 +535,113 @@ function download(isAudioOnly, downloadService) {
       }, 5000);
       break;
   }
-  hideMenu();
 }
 
-function addButtonDownloadInfo(serviceName, div) {
-  if (serviceName === 'cobalt') {
-    const option = gmc.get('buttonDownloadInfo');
-    if (option === 'never') return;
-    const quality = gmc.get('quality') || defaults.quality;
-    const vCodec = gmc.get('vCodec') || defaults.vCodec;
-    if (option === 'onchange' && quality === defaults.quality && vCodec === defaults.vCodec) return;
-    const qualityText = `${quality}, ${vCodec}`;
-    const downloadInfo = document.createElement('ydd-item-button-info');
-    downloadInfo.style.cssText = `
-                position: absolute;
-                left: 0;
-                bottom: -10px;
-                font-size: 0.8rem;
-                color: var(--yt-spec-text-primary);
-                opacity: 0.6;`;
-    downloadInfo.innerText = qualityText;
-    div.appendChild(downloadInfo);
-  }
-}
-
-function deleteButton() {
-  const buttons = document.getElementsByTagName('ydd-item');
-  if (buttons.length === 0) return;
-  const button = buttons[0];
-  button.remove();
-}
-
-function hideMenu() {
-  const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
-  if (!menu) return;
-  menuOuter = menu.parentElement.parentElement;
-  if (!menuOuter) return;
-  menuParent = menuOuter.parentNode;
-  nextSibling = menuOuter.nextSibling;
-  menuOuter.remove();
-}
-
-function addMenu() {
-  if (menuOuter && menuParent) {
-    if (nextSibling) {
-      menuParent.insertBefore(menuOuter, nextSibling);
-    } else {
-      menuParent.appendChild(menuOuter);
-    }
-    menuOuter.style.display = 'none';
-  }
-}
-
-const addStyles = () => {
+function addStyles() {
   const style = document.createElement('style');
-  style.type = 'text/css';
   style.innerHTML = yddCSS;
   document.head.appendChild(style);
-};
+}
 
-function removeButton(e) {
-  const menus = document.getElementsByTagName('tp-yt-iron-dropdown');
-  const menu = Array.from(menus).find((el) => !el.matches('#dropdown'));
-  if (menu && menu.style.display !== 'none' && !menu.contains(e.target) && yddItem) {
-    yddItem.remove();
-    yddItem = null;
-    window.removeEventListener('click', removeButton);
+function deleteButtons() {
+  const buttons = document.querySelectorAll('#ydd-button');
+  if (buttons.length === 0) return;
+  buttons.forEach((button) => {
+    button.remove();
+  });
+}
+
+function closeOptions(optionsDiv) {
+  optionsDiv.classList.remove('ydd-scale-up');
+  optionsDiv.classList.add('ydd-scale-down');
+  setTimeout(() => {
+    optionsDiv.remove();
+  }, 400);
+}
+
+function showOptions(div) {
+  let optionsDiv = document.getElementById('ydd-options-div');
+  if (optionsDiv) {
+    closeOptions(optionsDiv);
+    return;
   }
-}
-
-function createButton() {
-  addMenu();
-  if (yddItem) return;
-  const serviceName = gmc.get('downloadService') || defaults.downloadService;
-  const menu = document.getElementsByTagName('ytd-menu-popup-renderer')[0];
-  yddItem = document.createElement('ydd-item');
-  const icon = document.createElement('ydd-item-icon');
-  const text = document.createElement('ydd-item-text');
-  const button = document.createElement('ydd-item-button');
-  const sidebar = document.createElement('ydd-item-sidebar');
-  const settings = document.createElement('ydd-item-settings');
-  const audioButton = document.createElement('ydd-item-audio-download');
-  text.innerText = serviceName === 'auto' ? 'YDD' : serviceName;
-  icon.innerText = '⇩';
-  settings.innerText = '☰';
-  audioButton.innerText = '▶';
-  addButtonDownloadInfo(serviceName, text);
-  audioButton.title = `Download audio only`;
-  settings.title = 'Settings';
-  yddItem.appendChild(icon);
-  yddItem.appendChild(text);
-  yddItem.appendChild(button);
-  yddItem.appendChild(sidebar);
-  sidebar.appendChild(settings);
-  sidebar.appendChild(audioButton);
-
-  button.addEventListener('click', () => {
-    download();
+  optionsDiv = document.createElement('div');
+  const audio = document.createElement('div');
+  const subtitles = document.createElement('div');
+  const settings = document.createElement('div');
+  audio.innerText = '🔊 Audio';
+  subtitles.innerText = '🖹 Subtitles';
+  settings.innerText = '⛭ Settings';
+  optionsDiv.id = 'ydd-options-div';
+  optionsDiv.appendChild(audio);
+  optionsDiv.appendChild(subtitles);
+  optionsDiv.appendChild(settings);
+  div.appendChild(optionsDiv);
+  optionsDiv.style.opacity = undefined;
+  optionsDiv.classList.add('ydd-scale-up');
+  settings.addEventListener('click', () => {
+    opencfg();
+    closeOptions(optionsDiv);
   });
-
-  audioButton.addEventListener('click', () => {
+  audio.addEventListener('click', () => {
     download(true);
+    closeOptions(optionsDiv);
   });
-
-  if (gmc.get('subsDownload'))
-    audioButton.addEventListener('contextmenu', () => {
-      window.open(`https://downsub.com/?url=${document.location.href}`);
-    });
-
-  settings.addEventListener('click', opencfg);
-  menu.insertBefore(yddItem, menu.firstChild);
-  if (!checkShort(false)) window.addEventListener('click', removeButton);
+  subtitles.addEventListener('click', () => {
+    window.open(`https://downsub.com/?url=${document.location.href}`);
+    closeOptions(optionsDiv);
+  });
+  window.addEventListener('click', (e) => {
+    if (!div.contains(e.target)) {
+      closeOptions(optionsDiv);
+    }
+  });
 }
 
-function deleteSubscribeButton() {
-  const button = document.getElementById('ydd-button-sub');
-  if (!button) return;
-  button.remove();
-}
-
-function createSubscribeButton() {
-  if (!gmc.get('subscribeButton')) return;
-  const ownerBar = document.getElementById('owner');
-  if (!ownerBar || document.getElementById('ydd-button-sub')) return;
+function createButton(bar, short) {
+  if (!bar) return;
+  const div = document.createElement('div');
   const button = document.createElement('button');
-  button.id = 'ydd-button-sub';
-  ownerBar.appendChild(button);
+  const options = document.createElement('div');
+  div.id = 'ydd-button';
+  button.id = 'ydd-download';
+  options.id = 'ydd-options';
+  div.appendChild(button);
+  div.appendChild(options);
+  if (short) {
+    div.style.marginTop = '10px';
+    div.style.marginLeft = '0px';
+    bar.insertBefore(div, bar.firstChild);
+  } else bar.appendChild(div);
+
   let downloadService = gmc.get('downloadService') || defaults.downloadService;
-  if (downloadService === 'auto') {
-    button.title = 'Download with YDD';
-  } else button.title = 'Download via ' + downloadService;
+  switch (downloadService) {
+    case 'y2mate':
+      button.title = 'Y2Mate';
+      break;
+    case 'u2convert':
+      button.title = 'U2Convert';
+      break;
+    case 'yt1s':
+      button.title = 'YT1S';
+      break;
+    case 'cobalt':
+      const quality = gmc.get('quality') || defaults.quality;
+      const vCodec = gmc.get('vCodec') || defaults.vCodec;
+      const info = `${quality}, ${vCodec}`;
+      button.title = 'Cobalt: ' + info.toUpperCase();
+      break;
+    default:
+      button.title = 'YDD';
+      break;
+  }
   button.innerText = '⇩';
+  options.innerText = '☰';
   button.addEventListener('click', () => {
     download();
+  });
+  options.addEventListener('click', () => {
+    showOptions(div);
   });
 }
 
@@ -677,40 +652,39 @@ function checkShort(replace = true) {
   } else return false;
 }
 
-function modifyMenu() {
+function modify() {
   const short = checkShort();
-  if (yddItem && !short) {
-    yddItem.remove();
-    yddItem = null;
-  }
   if (document.location.href.indexOf('youtube.com/watch') === -1 && !short) {
     yddAdded = true;
     return;
   }
-  addMenu();
-  menuOuter = null;
-  menuParent = null;
-  nextSibling = null;
   if (short) {
-    const menuBtn = document.getElementById('menu-button');
-    if (!menuBtn) return;
+    const bars = document.querySelectorAll('#actions');
+    if (bars.length <= 1) {
+      yddAdded = false;
+      return;
+    }
+    deleteButtons();
+    bars.forEach((bar) => {
+      createButton(bar, true);
+    });
     yddAdded = true;
-    menuBtn.addEventListener('click', createButton);
-    return;
+  } else {
+    const bar = document.getElementById('owner');
+    if (!bar) {
+      yddAdded = false;
+      return;
+    }
+    deleteButtons();
+    createButton(bar, false);
+    yddAdded = true;
   }
-
-  const topRow = document.getElementById('top-row');
-  const menuBtn = topRow.querySelector('#button-shape');
-  createSubscribeButton();
-  if (!topRow || !menuBtn) return;
-  yddAdded = true;
-  menuBtn.addEventListener('click', createButton);
 }
 
 function onInit() {
   addStyles();
   const observer = new MutationObserver(function () {
-    if (!yddAdded) return modifyMenu();
+    if (!yddAdded) return modify();
     if (oldHref != document.location.href) {
       oldHref = document.location.href;
       yddAdded = false;
