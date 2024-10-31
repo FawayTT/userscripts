@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             3.1.1
+// @version             3.1.2
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -213,7 +213,7 @@ const yddCSS = `
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 15px;
   margin-left: 8px;
   box-shadow: 1px 0px 7px -4px rgba(0, 0, 0, 0.8);
@@ -332,7 +332,6 @@ const defaults = {
   disableMetadata: false,
   redirectShorts: false,
   backupService: 'y2mate',
-  cobaltInstance: 'https://api.cobalt.tools/api/json',
 };
 
 let frame = document.createElement('div');
@@ -359,12 +358,6 @@ let gmc = new GM_config({
       type: 'select',
       default: defaults.quality,
       options: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
-    },
-    cobaltInstance: {
-      label: 'Cobalt instance (v7):',
-      labelPos: 'left',
-      type: 'text',
-      default: defaults.cobaltInstance,
     },
     vCodec: {
       label: 'Video codec:',
@@ -500,7 +493,7 @@ function download(isAudioOnly, downloadService) {
       if (dError) return handleCobaltError(dError, isAudioOnly);
       GM_xmlhttpRequest({
         method: 'POST',
-        url: gmc.get('cobaltInstance'),
+        url: 'https://api.cobalt.tools/api/json',
         headers: getHeaders(),
         data: JSON.stringify({
           url: encodeURI(document.location.href),
@@ -515,10 +508,7 @@ function download(isAudioOnly, downloadService) {
         onload: (response) => {
           try {
             if (response.status === 403) {
-              handleCobaltError(
-                'Cobalt is blocking your request with Bot Protection. Host your own instance, or try again later. If you want to hide this message, switch to download service "auto".',
-                isAudioOnly
-              );
+              handleCobaltError('Cobalt is blocking your request with Bot Protection. If you want to hide this message, switch to download service "auto".', isAudioOnly);
               return;
             }
             const data = JSON.parse(response.responseText);
