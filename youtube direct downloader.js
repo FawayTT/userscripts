@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             3.1.2
-// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
+// @version             3.2.0
+// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @supportURL          https://github.com/FawayTT/userscripts/issues
 // @icon                https://github.com/FawayTT/userscripts/blob/main/ydd-icon.png?raw=true
 // @match               https://www.youtube.com/*
+// @match               https://yt5s.biz/*
 // @connect             api.cobalt.tools
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
@@ -331,7 +332,7 @@ const defaults = {
   isAudioMuted: false,
   disableMetadata: false,
   redirectShorts: false,
-  backupService: 'y2mate',
+  backupService: 'yt5s',
 };
 
 let frame = document.createElement('div');
@@ -349,7 +350,7 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['auto', 'cobalt', 'y2mate', 'yt1s'],
+      options: ['auto', 'cobalt', 'yt5s', 'y2mate', 'yt1s'],
     },
     quality: {
       section: ['Cobalt-only settings'],
@@ -392,7 +393,7 @@ let gmc = new GM_config({
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: ['y2mate', 'yt1s', 'none'],
+      options: ['y2mate', 'yt5s', 'yt1s', 'none'],
     },
     redirectShorts: {
       section: ['Extra features'],
@@ -465,7 +466,7 @@ function getYouTubeVideoID(url) {
 }
 
 function handleCobaltError(errorMessage, isAudioOnly) {
-  const backupService = gmc.get('backupService') || 'y2mate';
+  const backupService = gmc.get('backupService') || 'yt5s';
   if (gmc.get('downloadService') === 'auto') {
     download(isAudioOnly, backupService);
     return;
@@ -488,6 +489,10 @@ function download(isAudioOnly, downloadService) {
     case 'yt1s':
       if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
+      break;
+    case 'yt5s':
+      if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
+      window.open('https://yt5s.biz/enxj100/?ydd=' + encodeURI(document.location.href));
       break;
     default:
       if (dError) return handleCobaltError(dError, isAudioOnly);
@@ -622,6 +627,9 @@ function createButton(bar, short) {
     case 'yt1s':
       button.title = 'YT1S';
       break;
+    case 'y5ts':
+      button.title = 'Y5TS';
+      break;
     case 'cobalt':
       const quality = gmc.get('quality') || defaults.quality;
       const vCodec = gmc.get('vCodec') || defaults.vCodec;
@@ -649,8 +657,29 @@ function checkShort(replace = true) {
   } else return false;
 }
 
+function checkyt5s() {
+  if (document.location.href.indexOf('yt5s.biz/enxj100') > -1) {
+    const url = new URL(document.location.href);
+    const site = url.searchParams.get('ydd');
+    if (site) {
+      const input = document.querySelector('#txt-url');
+      const button = document.querySelector('#btn-submit');
+      if (!input || !button) {
+        yddAdded = false;
+      } else {
+        yddAdded = true;
+        input.value = site;
+        button.click();
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 function modify() {
   const short = checkShort();
+  if (checkyt5s()) return;
   if (document.location.href.indexOf('youtube.com/watch') === -1 && !short) {
     yddAdded = true;
     return;
