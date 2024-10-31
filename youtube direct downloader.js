@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             3.0.0
+// @version             3.1.0
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, u2convert) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -88,7 +88,7 @@ const gmcCSS = `
   color: #ff0000;
 }
 
-.section_header {
+ #YDD_config .section_header {
   background: none !important;
   width: fit-content;
   margin: 5px 0px !important;
@@ -97,7 +97,7 @@ const gmcCSS = `
   color: #ff0000 !important;
 }
 
-input, select, textarea {
+ #YDD_config input, select, textarea {
   cursor: pointer;
   background-color: #333;
   color: #fff;
@@ -107,24 +107,24 @@ input, select, textarea {
   margin: 5px 0 !important;
 }
 
-::selection {
+ #YDD_config ::selection {
   color: white;
   background: #ff0000;
 }
 
-input, select, textarea {
+ #YDD_config input, select, textarea {
   transition: all 0.1s ease-in;
 }
 
-input:focus, select:focus, textarea:focus {
+ #YDD_config input:focus, select:focus, textarea:focus {
   border-color: #ff0000;
 }
 
-input:hover, select:hover, textarea:hover {
+ #YDD_config input:hover, select:hover, textarea:hover {
   opacity: 0.8;
 }
 
-label {
+ #YDD_config label {
   color: #fff;
 }
 
@@ -205,6 +205,16 @@ input[type='checkbox']:checked::after {
   margin-right: 6px;
   opacity: 0.7;
 }
+  
+#YDD_config_cobaltInstance_var:after {
+  content: "▲ Host your own instance to avoid Cobalt error. For more info click on Cobalt github page.";
+  display: block;
+  font-family: arial, tahoma, myriad pro, sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  margin-right: 6px;
+  opacity: 0.7;
+}
 `;
 
 const yddCSS = `
@@ -213,7 +223,7 @@ const yddCSS = `
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 15px;
   margin-left: 8px;
   box-shadow: 1px 0px 7px -4px rgba(0, 0, 0, 0.8);
@@ -259,7 +269,7 @@ const yddCSS = `
   position: absolute;
   top: 0px;
   transform: translateY(-70%);
-  right: -18px;
+  right: -24px;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -332,6 +342,8 @@ const defaults = {
   disableMetadata: false,
   redirectShorts: false,
   backupService: 'y2mate',
+  cobaltInstance: 'https://api.cobalt.tools/api/json',
+  hideShortsFromSubscribes: false,
 };
 
 let frame = document.createElement('div');
@@ -358,6 +370,12 @@ let gmc = new GM_config({
       type: 'select',
       default: defaults.quality,
       options: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
+    },
+    cobaltInstance: {
+      label: 'Cobalt instance:',
+      labelPos: 'left',
+      type: 'text',
+      default: defaults.cobaltInstance,
     },
     vCodec: {
       label: 'Video codec:',
@@ -400,6 +418,12 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'checkbox',
       default: defaults.redirectShorts,
+    },
+    hideShortsFromSubscribes: {
+      label: 'Hide shorts from subscriptions:',
+      labelPos: 'left',
+      type: 'checkbox',
+      default: defaults.hideShortsFromSubscribes,
     },
     url: {
       section: ['Links'],
@@ -497,7 +521,7 @@ function download(isAudioOnly, downloadService) {
       if (dError) return handleCobaltError(dError, isAudioOnly);
       GM_xmlhttpRequest({
         method: 'POST',
-        url: 'https://api.cobalt.tools/api/json',
+        url: gmc.get('cobaltInstance'),
         headers: getHeaders(),
         data: JSON.stringify({
           url: encodeURI(document.location.href),
@@ -511,6 +535,13 @@ function download(isAudioOnly, downloadService) {
         }),
         onload: (response) => {
           try {
+            if (response.status === 403) {
+              handleCobaltError(
+                'Cobalt is blocking your request with Bot Protection. Host your own instance, or try again later. If you want to hide this message, switch to download service "auto". More info: https://github.com/imputnet/cobalt/blob/main/docs/api.md',
+                isAudioOnly
+              );
+              return;
+            }
             const data = JSON.parse(response.responseText);
             if (data.url) window.open(data.url);
             else handleCobaltError(data.text, isAudioOnly);
@@ -652,10 +683,34 @@ function checkShort(replace = true) {
   } else return false;
 }
 
+function checkShortSubscribe() {
+  if (gmc.get('hideShortsFromSubscribes') && document.location.href.indexOf('youtube.com/feed/subscriptions') > -1) {
+    const shorts = document.querySelectorAll('#scroll-container > .yt-horizontal-list-renderer.style-scope');
+    const shortsTitle = document.querySelectorAll('.ytd-item-section-renderer.style-scope > .ytd-reel-shelf-renderer.style-scope');
+    const shortsBar = document.querySelectorAll('.ytd-rich-section-renderer.style-scope > .ytd-rich-shelf-renderer.style-scope');
+    const length = shorts.length + shortsTitle.length + shortsBar.length;
+    if (length === 0) {
+      yddAdded = false;
+      return;
+    }
+    shorts.forEach((short) => {
+      short.remove();
+    });
+    shortsTitle.forEach((short) => {
+      short.remove();
+    });
+    shortsBar.forEach((short) => {
+      short.remove();
+    });
+    yddAdded = true;
+  }
+}
+
 function modify() {
   const short = checkShort();
   if (document.location.href.indexOf('youtube.com/watch') === -1 && !short) {
     yddAdded = true;
+    checkShortSubscribe();
     return;
   }
   if (short) {
