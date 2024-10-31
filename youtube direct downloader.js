@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             3.1.0
-// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, u2convert) in settings.
+// @version             3.1.1
+// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @supportURL          https://github.com/FawayTT/userscripts/issues
@@ -205,16 +205,6 @@ input[type='checkbox']:checked::after {
   margin-right: 6px;
   opacity: 0.7;
 }
-  
-#YDD_config_cobaltInstance_var:after {
-  content: "▲ Host your own instance to avoid Cobalt error. For more info click on Cobalt github page.";
-  display: block;
-  font-family: arial, tahoma, myriad pro, sans-serif;
-  font-size: 10px;
-  font-weight: bold;
-  margin-right: 6px;
-  opacity: 0.7;
-}
 `;
 
 const yddCSS = `
@@ -343,7 +333,6 @@ const defaults = {
   redirectShorts: false,
   backupService: 'y2mate',
   cobaltInstance: 'https://api.cobalt.tools/api/json',
-  hideShortsFromSubscribes: false,
 };
 
 let frame = document.createElement('div');
@@ -361,7 +350,7 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['auto', 'cobalt', 'y2mate', 'yt1s', 'u2convert'],
+      options: ['auto', 'cobalt', 'y2mate', 'yt1s'],
     },
     quality: {
       section: ['Cobalt-only settings'],
@@ -372,7 +361,7 @@ let gmc = new GM_config({
       options: ['max', '2160', '1440', '1080', '720', '480', '360', '240', '144'],
     },
     cobaltInstance: {
-      label: 'Cobalt instance:',
+      label: 'Cobalt instance (v7):',
       labelPos: 'left',
       type: 'text',
       default: defaults.cobaltInstance,
@@ -410,7 +399,7 @@ let gmc = new GM_config({
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: ['y2mate', 'yt1s', 'u2convert', 'none'],
+      options: ['y2mate', 'yt1s', 'none'],
     },
     redirectShorts: {
       section: ['Extra features'],
@@ -418,12 +407,6 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'checkbox',
       default: defaults.redirectShorts,
-    },
-    hideShortsFromSubscribes: {
-      label: 'Hide shorts from subscriptions:',
-      labelPos: 'left',
-      type: 'checkbox',
-      default: defaults.hideShortsFromSubscribes,
     },
     url: {
       section: ['Links'],
@@ -513,10 +496,6 @@ function download(isAudioOnly, downloadService) {
       if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
       break;
-    case 'u2convert':
-      if (isAudioOnly) window.open(`https://u2convert.com/mp3-download/${getYouTubeVideoID(document.location.href)}`);
-      else window.open(`https://u2convert.com/download/${getYouTubeVideoID(document.location.href)}`);
-      break;
     default:
       if (dError) return handleCobaltError(dError, isAudioOnly);
       GM_xmlhttpRequest({
@@ -537,7 +516,7 @@ function download(isAudioOnly, downloadService) {
           try {
             if (response.status === 403) {
               handleCobaltError(
-                'Cobalt is blocking your request with Bot Protection. Host your own instance, or try again later. If you want to hide this message, switch to download service "auto". More info: https://github.com/imputnet/cobalt/blob/main/docs/api.md',
+                'Cobalt is blocking your request with Bot Protection. Host your own instance, or try again later. If you want to hide this message, switch to download service "auto".',
                 isAudioOnly
               );
               return;
@@ -650,9 +629,6 @@ function createButton(bar, short) {
     case 'y2mate':
       button.title = 'Y2Mate';
       break;
-    case 'u2convert':
-      button.title = 'U2Convert';
-      break;
     case 'yt1s':
       button.title = 'YT1S';
       break;
@@ -683,34 +659,10 @@ function checkShort(replace = true) {
   } else return false;
 }
 
-function checkShortSubscribe() {
-  if (gmc.get('hideShortsFromSubscribes') && document.location.href.indexOf('youtube.com/feed/subscriptions') > -1) {
-    const shorts = document.querySelectorAll('#scroll-container > .yt-horizontal-list-renderer.style-scope');
-    const shortsTitle = document.querySelectorAll('.ytd-item-section-renderer.style-scope > .ytd-reel-shelf-renderer.style-scope');
-    const shortsBar = document.querySelectorAll('.ytd-rich-section-renderer.style-scope > .ytd-rich-shelf-renderer.style-scope');
-    const length = shorts.length + shortsTitle.length + shortsBar.length;
-    if (length === 0) {
-      yddAdded = false;
-      return;
-    }
-    shorts.forEach((short) => {
-      short.remove();
-    });
-    shortsTitle.forEach((short) => {
-      short.remove();
-    });
-    shortsBar.forEach((short) => {
-      short.remove();
-    });
-    yddAdded = true;
-  }
-}
-
 function modify() {
   const short = checkShort();
   if (document.location.href.indexOf('youtube.com/watch') === -1 && !short) {
     yddAdded = true;
-    checkShortSubscribe();
     return;
   }
   if (short) {
