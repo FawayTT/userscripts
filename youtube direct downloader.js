@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             3.2.0
+// @version             4.0.0
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -8,7 +8,9 @@
 // @icon                https://github.com/FawayTT/userscripts/blob/main/ydd-icon.png?raw=true
 // @match               https://www.youtube.com/*
 // @match               https://yt5s.biz/*
-// @connect             api.cobalt.tools
+// @match               https://cobalt.tools/*
+// @match               https://5smp3.com/*
+// @connect             cobalt-api.kwiatekmiki.com
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
 // @grant               GM_setValue
@@ -178,7 +180,7 @@ input[type='checkbox']:checked::after {
 }
 
 #YDD_config_downloadService_var:after {
-  content: "▲ Use cobalt for best quality.";
+  content: "▲ Use cobalt_api for direct download.";
   display: block;
   font-family: arial, tahoma, myriad pro, sans-serif;
   font-size: 10px;
@@ -328,11 +330,11 @@ const defaults = {
   quality: 'max',
   vCodec: 'vp9',
   aFormat: 'mp3',
-  filenamePattern: 'pretty',
+  filenamePattern: 'basic',
   isAudioMuted: false,
   disableMetadata: false,
   redirectShorts: false,
-  backupService: 'yt5s',
+  backupService: 'cobalt_web',
 };
 
 let frame = document.createElement('div');
@@ -350,7 +352,7 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['auto', 'cobalt', 'yt5s', 'y2mate', 'yt1s'],
+      options: ['auto', 'cobalt_api', 'cobalt_web', 'yt5s', 'y2mate', 'yt1s'],
     },
     quality: {
       section: ['Cobalt-only settings'],
@@ -393,7 +395,7 @@ let gmc = new GM_config({
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: ['y2mate', 'yt5s', 'yt1s', 'none'],
+      options: ['cobalt_web', 'y2mate', 'yt5s', 'yt1s', 'none'],
     },
     redirectShorts: {
       section: ['Extra features'],
@@ -404,7 +406,7 @@ let gmc = new GM_config({
     },
     url: {
       section: ['Links'],
-      label: 'All my userscripts - FawayTT',
+      label: 'Creator of this script - FawayTT',
       type: 'button',
       click: () => {
         GM_openInTab('https://github.com/FawayTT/userscripts');
@@ -415,6 +417,13 @@ let gmc = new GM_config({
       type: 'button',
       click: () => {
         GM_openInTab('https://github.com/imputnet/cobalt');
+      },
+    },
+    cobaltInstance: {
+      label: 'Cobalt instance provider',
+      type: 'button',
+      click: () => {
+        GM_openInTab('kwiatekmiki.com');
       },
     },
   },
@@ -491,31 +500,34 @@ function download(isAudioOnly, downloadService) {
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
       break;
     case 'yt5s':
-      if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
-      window.open('https://yt5s.biz/enxj100/?ydd=' + encodeURI(document.location.href));
+      if (isAudioOnly) window.open('https://5smp3.com/?ydd=' + encodeURI(document.location.href));
+      else window.open('https://yt5s.biz/enxj100/?ydd=' + encodeURI(document.location.href));
+      break;
+    case 'cobalt_web':
+      if (isAudioOnly) window.open('https://cobalt.tools/?ydd=' + encodeURI(document.location.href) + '&audioOnly=true');
+      else window.open('https://cobalt.tools/?ydd=' + encodeURI(document.location.href));
       break;
     default:
       if (dError) return handleCobaltError(dError, isAudioOnly);
       GM_xmlhttpRequest({
         method: 'POST',
-        url: 'https://api.cobalt.tools/api/json',
+        url: 'https://cobalt-api.kwiatekmiki.com',
         headers: getHeaders(),
         data: JSON.stringify({
           url: encodeURI(document.location.href),
-          vQuality: gmc.get('quality'),
-          vCodec: gmc.get('vCodec'),
-          aFormat: gmc.get('aFormat'),
-          filenamePattern: gmc.get('filenamePattern'),
-          isAudioMuted: gmc.get('isAudioMuted'),
+          videoQuality: gmc.get('quality'),
+          youtubeVideoCodec: gmc.get('vCodec'),
+          audioFormat: gmc.get('aFormat'),
+          filenameStyle: gmc.get('filenamePattern'),
           disableMetadata: gmc.get('disableMetadata'),
-          isAudioOnly: isAudioOnly,
+          downloadMode: isAudioOnly ? 'audio' : `${gmc.get('isAudioMuted') ? 'muted' : 'auto'}`,
         }),
         onload: (response) => {
+          if (response.status === 403) {
+            handleCobaltError('Cobalt is blocking your request with Bot Protection. If you want to hide this message, switch to download service "auto".', isAudioOnly);
+            return;
+          }
           try {
-            if (response.status === 403) {
-              handleCobaltError('Cobalt is blocking your request with Bot Protection. If you want to hide this message, switch to download service "auto".', isAudioOnly);
-              return;
-            }
             const data = JSON.parse(response.responseText);
             if (data.url) window.open(data.url);
             else handleCobaltError(data.text, isAudioOnly);
@@ -630,7 +642,10 @@ function createButton(bar, short) {
     case 'y5ts':
       button.title = 'Y5TS';
       break;
-    case 'cobalt':
+    case 'cobalt_web':
+      button.title = 'Cobalt';
+      break;
+    case 'cobalt_api':
       const quality = gmc.get('quality') || defaults.quality;
       const vCodec = gmc.get('vCodec') || defaults.vCodec;
       const info = `${quality}, ${vCodec}`;
@@ -657,29 +672,67 @@ function checkShort(replace = true) {
   } else return false;
 }
 
-function checkyt5s() {
-  if (document.location.href.indexOf('yt5s.biz/enxj100') > -1) {
-    const url = new URL(document.location.href);
-    const site = url.searchParams.get('ydd');
-    if (site) {
-      const input = document.querySelector('#txt-url');
-      const button = document.querySelector('#btn-submit');
-      if (!input || !button) {
-        yddAdded = false;
-      } else {
-        yddAdded = true;
-        input.value = site;
-        button.click();
+function checkPage() {
+  switch (gmc.get('downloadService')) {
+    case 'cobalt_web':
+      if (document.location.href.indexOf('cobalt.tools') > -1) {
+        const url = new URL(document.location.href);
+        const site = url.searchParams.get('ydd');
+        if (site) {
+          const audioOnly = url.searchParams.get('audioOnly') === 'true';
+          const input = document.querySelector('#link-area');
+          const button = audioOnly ? document.querySelector('#setting-button-save-downloadMode-audio') : document.querySelector('#setting-button-save-downloadMode-auto');
+          if (!input || !button) {
+            yddAdded = false;
+          } else {
+            yddAdded = true;
+            input.value = site;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true })); // Optional
+            button.click();
+            let interval;
+            setTimeout(() => {
+              interval = setInterval(() => {
+                const loadingIcon = document.querySelector('#input-link-icon');
+                if (loadingIcon.classList.contains('loading') || !loadingIcon) return;
+                const dwnButton = document.querySelector('#download-button');
+                setTimeout(() => {
+                  dwnButton.click();
+                }, 500);
+                clearInterval(interval);
+              }, 500);
+            }, 1000);
+          }
+        }
+        return true;
       }
-    }
-    return true;
+      return false;
+    case 'yt5s':
+      if (document.location.href.indexOf('yt5s.biz/enxj100') > -1 || document.location.href.indexOf('5smp3.com') > -1) {
+        const url = new URL(document.location.href);
+        const site = url.searchParams.get('ydd');
+        if (site) {
+          const input = document.querySelector('#txt-url');
+          const button = document.querySelector('#btn-submit');
+          if (!input || !button) {
+            yddAdded = false;
+          } else {
+            yddAdded = true;
+            input.value = site;
+            button.click();
+          }
+        }
+        return true;
+      }
+      return false;
+    default:
+      return false;
   }
-  return false;
 }
 
 function modify() {
   const short = checkShort();
-  if (checkyt5s()) return;
+  if (checkPage()) return;
   if (document.location.href.indexOf('youtube.com/watch') === -1 && !short) {
     yddAdded = true;
     return;
