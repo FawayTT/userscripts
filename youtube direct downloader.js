@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.0.0
+// @version             4.1.0
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -180,7 +180,7 @@ input[type='checkbox']:checked::after {
 }
 
 #YDD_config_downloadService_var:after {
-  content: "▲ Use cobalt_api for direct download.";
+  content: "▲ Use cobalt_api or auto for direct download.";
   display: block;
   font-family: arial, tahoma, myriad pro, sans-serif;
   font-size: 10px;
@@ -200,7 +200,7 @@ input[type='checkbox']:checked::after {
 }
 
 #YDD_config_backupService_var:after {
-  content: "▲ In case Cobalt isn't working, automatically use this download service.";
+  content: "▲ In case api isn't working, automatically use this download service. Also available via right click.";
   display: block;
   font-family: arial, tahoma, myriad pro, sans-serif;
   font-size: 10px;
@@ -211,6 +211,10 @@ input[type='checkbox']:checked::after {
 `;
 
 const yddCSS = `
+#experiment-overlay {
+  overflow: visible !important;
+}
+
 #ydd-button {
   position: relative;
   display: flex;
@@ -272,7 +276,7 @@ const yddCSS = `
   padding: 6px;
   display: flex;
   flex-direction: column;
-  z-index: 100;
+  z-index: 9999999;
   font-family: "Roboto","Arial",sans-serif;
   font-weight: 500;
   font-size: 1.2rem;
@@ -295,7 +299,7 @@ const yddCSS = `
 @keyframes scaleIn {
   0% {
     transform: scale(0.8) translateY(-60%);
-    opacity: 0;            /* Start transparent */
+    opacity: 0;
   }
   100% {
     transform: scale(1) translateY(-70%);
@@ -328,7 +332,7 @@ GM_registerMenuCommand('Settings', opencfg);
 const defaults = {
   downloadService: 'auto',
   quality: 'max',
-  vCodec: 'vp9',
+  vCodec: 'av1',
   aFormat: 'mp3',
   filenamePattern: 'basic',
   isAudioMuted: false,
@@ -355,7 +359,7 @@ let gmc = new GM_config({
       options: ['auto', 'cobalt_api', 'cobalt_web', 'yt5s', 'y2mate', 'yt1s'],
     },
     quality: {
-      section: ['Cobalt-only settings'],
+      section: ['Cobalt API settings'],
       label: 'Quality:',
       labelPos: 'left',
       type: 'select',
@@ -431,9 +435,7 @@ let gmc = new GM_config({
     save: function () {
       gmc.close();
       deleteButtons();
-      const bar = document.getElementById('owner');
-      if (!bar) return;
-      createButton(bar, checkShort(false));
+      modify();
     },
     init: onInit,
   },
@@ -475,7 +477,7 @@ function getYouTubeVideoID(url) {
 }
 
 function handleCobaltError(errorMessage, isAudioOnly) {
-  const backupService = gmc.get('backupService') || 'yt5s';
+  const backupService = gmc.get('backupService') || defaults.backupService;
   if (gmc.get('downloadService') === 'auto') {
     download(isAudioOnly, backupService);
     return;
@@ -639,8 +641,8 @@ function createButton(bar, short) {
     case 'yt1s':
       button.title = 'YT1S';
       break;
-    case 'y5ts':
-      button.title = 'Y5TS';
+    case 'yt5s':
+      button.title = 'YT5S';
       break;
     case 'cobalt_web':
       button.title = 'Cobalt';
@@ -660,6 +662,11 @@ function createButton(bar, short) {
   button.addEventListener('click', () => {
     download();
   });
+  button.addEventListener('contextmenu', (e) => {
+    const downloadService = gmc.get('downloadService') || defaults.downloadService;
+    const backupService = gmc.get('backupService') || defaults.backupService;
+    if (downloadService !== backupService && backupService !== 'none') download(false, backupService);
+  });
   options.addEventListener('click', () => {
     showOptions(div);
   });
@@ -672,8 +679,9 @@ function checkShort(replace = true) {
   } else return false;
 }
 
-function checkPage() {
-  switch (gmc.get('downloadService')) {
+function checkPage(alternative) {
+  const service = alternative ? gmc.get('backupService') : gmc.get('downloadService');
+  switch (service) {
     case 'cobalt_web':
       if (document.location.href.indexOf('cobalt.tools') > -1) {
         const url = new URL(document.location.href);
@@ -688,7 +696,7 @@ function checkPage() {
             yddAdded = true;
             input.value = site;
             input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true })); // Optional
+            input.dispatchEvent(new Event('change', { bubbles: true }));
             button.click();
             let interval;
             setTimeout(() => {
@@ -732,7 +740,7 @@ function checkPage() {
 
 function modify() {
   const short = checkShort();
-  if (checkPage()) return;
+  if (checkPage() || checkPage(true)) return;
   if (document.location.href.indexOf('youtube.com/watch') === -1 && !short) {
     yddAdded = true;
     return;
