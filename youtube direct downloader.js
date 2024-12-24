@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.1.0
+// @version             4.2.0
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -180,7 +180,7 @@ input[type='checkbox']:checked::after {
 }
 
 #YDD_config_downloadService_var:after {
-  content: "▲ Use cobalt_api or auto for direct download.";
+  content: "▲ Use cobalt_api (or auto) for direct download only at your own discretion as it is hosted by third-party and could cause issues.";
   display: block;
   font-family: arial, tahoma, myriad pro, sans-serif;
   font-size: 10px;
@@ -200,7 +200,7 @@ input[type='checkbox']:checked::after {
 }
 
 #YDD_config_backupService_var:after {
-  content: "▲ In case api isn't working, automatically use this download service. Also available via right click.";
+  content: "▲ Available via right click or used automatically when direct download is not working.";
   display: block;
   font-family: arial, tahoma, myriad pro, sans-serif;
   font-size: 10px;
@@ -343,6 +343,7 @@ const defaults = {
 
 let frame = document.createElement('div');
 document.body.appendChild(frame);
+let cobaltTries = 0;
 
 let gmc = new GM_config({
   id: 'YDD_config',
@@ -352,11 +353,17 @@ let gmc = new GM_config({
   fields: {
     downloadService: {
       section: ['Download method'],
-      label: 'Service:',
+      label: 'Main service:',
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
       options: ['auto', 'cobalt_api', 'cobalt_web', 'yt5s', 'y2mate', 'yt1s'],
+    },
+    backupService: {
+      label: 'Backup service:',
+      type: 'select',
+      default: defaults.backupService,
+      options: ['cobalt_web', 'cobalt_api', 'y2mate', 'yt5s', 'yt1s', 'none'],
     },
     quality: {
       section: ['Cobalt API settings'],
@@ -395,12 +402,7 @@ let gmc = new GM_config({
       default: defaults.filenamePattern,
       options: ['classic', 'pretty', 'basic', 'nerdy'],
     },
-    backupService: {
-      label: 'Backup service:',
-      type: 'select',
-      default: defaults.backupService,
-      options: ['cobalt_web', 'y2mate', 'yt5s', 'yt1s', 'none'],
-    },
+
     redirectShorts: {
       section: ['Extra features'],
       label: 'Redirect shorts:',
@@ -478,12 +480,12 @@ function getYouTubeVideoID(url) {
 
 function handleCobaltError(errorMessage, isAudioOnly) {
   const backupService = gmc.get('backupService') || defaults.backupService;
-  if (gmc.get('downloadService') === 'auto') {
+  if (gmc.get('downloadService') === 'auto' && backupService !== 'cobalt_api') {
     download(isAudioOnly, backupService);
     return;
   }
   let alertText = 'Cobalt error: ' + (errorMessage || 'Something went wrong! Try again later.');
-  if (backupService !== 'none') {
+  if (backupService !== 'none' && backupService !== 'cobalt_api') {
     alertText += '\n\nYou will be redirected to backup provider ' + backupService + '.';
     alert(alertText);
     download(isAudioOnly, backupService);
@@ -525,28 +527,25 @@ function download(isAudioOnly, downloadService) {
           downloadMode: isAudioOnly ? 'audio' : `${gmc.get('isAudioMuted') ? 'muted' : 'auto'}`,
         }),
         onload: (response) => {
+          const data = response.responseText && JSON.parse(response.responseText);
           if (response.status === 403) {
             handleCobaltError('Cobalt is blocking your request with Bot Protection. If you want to hide this message, switch to download service "auto".', isAudioOnly);
-            return;
-          }
-          try {
-            const data = JSON.parse(response.responseText);
-            if (data.url) window.open(data.url);
-            else handleCobaltError(data.text, isAudioOnly);
-          } catch (error) {
-            handleCobaltError(null, isAudioOnly);
-            if (downloadService !== 'auto') console.error(error);
+          } else if (response.status !== 200 || response.status !== 201) {
+            handleCobaltError(`Something went wrong! Try again later. (${data.error.code || data.text || data.statusText || ''})`, isAudioOnly);
+          } else if (!data.url) {
+            handleCobaltError('Cobalt is not sending expected response.', isAudioOnly);
+          } else {
+            window.open(data.url);
           }
         },
         onerror: function (error) {
-          const errorMessage = error.message || error;
-          handleCobaltError(errorMessage, isAudioOnly);
+          handleCobaltError(error.message || error, isAudioOnly);
         },
         ontimeout: function () {
-          const alertText = 'Cobalt is not responding. Please try again later.';
-          handleCobaltError(alertText, isAudioOnly);
+          handleCobaltError('Cobalt is not responding. Please try again later.', isAudioOnly);
         },
       });
+
       clearTimeout(dTimeout);
       dError = 'Slow down.';
       dTimeout = setTimeout(() => {
@@ -690,26 +689,24 @@ function checkPage(alternative) {
           const audioOnly = url.searchParams.get('audioOnly') === 'true';
           const input = document.querySelector('#link-area');
           const button = audioOnly ? document.querySelector('#setting-button-save-downloadMode-audio') : document.querySelector('#setting-button-save-downloadMode-auto');
-          if (!input || !button) {
-            yddAdded = false;
+          const loadingIcon = document.querySelector('#input-icons');
+          if (!input || !button || !loadingIcon) {
+            cobaltTries++;
+            if (cobaltTries > 10) yddAdded = true;
+            else yddAdded = false;
           } else {
             yddAdded = true;
             input.value = site;
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
             button.click();
-            let interval;
-            setTimeout(() => {
-              interval = setInterval(() => {
-                const loadingIcon = document.querySelector('#input-link-icon');
-                if (loadingIcon.classList.contains('loading') || !loadingIcon) return;
-                const dwnButton = document.querySelector('#download-button');
-                setTimeout(() => {
-                  dwnButton.click();
-                }, 500);
-                clearInterval(interval);
-              }, 500);
-            }, 1000);
+            const observer = new MutationObserver(function () {
+              if (loadingIcon.classList.contains('loading') || !loadingIcon) return;
+              const dwnButton = document.querySelector('#download-button');
+              dwnButton.click();
+              observer.disconnect();
+            });
+            observer.observe(loadingIcon, { attributes: true, attributeFilter: ['class'] });
           }
         }
         return true;
