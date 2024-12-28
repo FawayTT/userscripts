@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.2.0
+// @version             4.3.0
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -180,7 +180,7 @@ input[type='checkbox']:checked::after {
 }
 
 #YDD_config_downloadService_var:after {
-  content: "▲ Use cobalt_api (or auto) for direct download only at your own discretion as it is hosted by third-party and could cause issues.";
+  content: "▲ Use cobalt_api for direct download.";
   display: block;
   font-family: arial, tahoma, myriad pro, sans-serif;
   font-size: 10px;
@@ -330,7 +330,7 @@ const yddCSS = `
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
-  downloadService: 'auto',
+  downloadService: 'cobalt_api',
   quality: 'max',
   vCodec: 'av1',
   aFormat: 'mp3',
@@ -339,6 +339,7 @@ const defaults = {
   disableMetadata: false,
   redirectShorts: false,
   backupService: 'cobalt_web',
+  showCobaltError: false,
 };
 
 let frame = document.createElement('div');
@@ -357,7 +358,7 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['auto', 'cobalt_api', 'cobalt_web', 'yt5s', 'y2mate', 'yt1s'],
+      options: ['cobalt_api', 'cobalt_web', 'yt5s', 'y2mate', 'yt1s'],
     },
     backupService: {
       label: 'Backup service:',
@@ -402,7 +403,11 @@ let gmc = new GM_config({
       default: defaults.filenamePattern,
       options: ['classic', 'pretty', 'basic', 'nerdy'],
     },
-
+    showCobaltError: {
+      label: 'Show error messages:',
+      type: 'checkbox',
+      default: defaults.showCobaltError,
+    },
     redirectShorts: {
       section: ['Extra features'],
       label: 'Redirect shorts:',
@@ -480,7 +485,8 @@ function getYouTubeVideoID(url) {
 
 function handleCobaltError(errorMessage, isAudioOnly) {
   const backupService = gmc.get('backupService') || defaults.backupService;
-  if (gmc.get('downloadService') === 'auto' && backupService !== 'cobalt_api') {
+  const showError = gmc.get('showCobaltError');
+  if (!showError && backupService !== 'cobalt_api') {
     download(isAudioOnly, backupService);
     return;
   }
@@ -528,14 +534,13 @@ function download(isAudioOnly, downloadService) {
         }),
         onload: (response) => {
           const data = response.responseText && JSON.parse(response.responseText);
-          if (response.status === 403) {
-            handleCobaltError('Cobalt is blocking your request with Bot Protection. If you want to hide this message, switch to download service "auto".', isAudioOnly);
-          } else if (response.status !== 200 || response.status !== 201) {
-            handleCobaltError(`Something went wrong! Try again later. (${data.error.code || data.text || data.statusText || ''})`, isAudioOnly);
-          } else if (!data.url) {
-            handleCobaltError('Cobalt is not sending expected response.', isAudioOnly);
+          if (response.status === 200) {
+            if (data.url) window.open(data.url);
+            else handleCobaltError('Cobalt is not sending expected response.', isAudioOnly);
+          } else if (response.status === 403) {
+            handleCobaltError('Cobalt is blocking your request with Bot Protection.', isAudioOnly);
           } else {
-            window.open(data.url);
+            handleCobaltError(`Something went wrong! Try again later. (${data.error.code || data.text || data.statusText || ''})`, isAudioOnly);
           }
         },
         onerror: function (error) {
