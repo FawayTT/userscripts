@@ -651,12 +651,13 @@ function createButton(bar, short) {
     case 'cobalt_web':
       button.title = 'Cobalt';
       break;
-    case 'cobalt_api':
+    case 'cobalt_api':{
       const quality = gmc.get('quality') || defaults.quality;
       const vCodec = gmc.get('vCodec') || defaults.vCodec;
       const info = `${quality}, ${vCodec}`;
       button.title = 'Cobalt: ' + info.toUpperCase();
       break;
+    }
     default:
       button.title = 'YDD';
       break;
