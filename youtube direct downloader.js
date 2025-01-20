@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.3.0
+// @version             4.3.3
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -651,12 +651,13 @@ function createButton(bar, short) {
     case 'cobalt_web':
       button.title = 'Cobalt';
       break;
-    case 'cobalt_api':
+    case 'cobalt_api': {
       const quality = gmc.get('quality') || defaults.quality;
       const vCodec = gmc.get('vCodec') || defaults.vCodec;
       const info = `${quality}, ${vCodec}`;
       button.title = 'Cobalt: ' + info.toUpperCase();
       break;
+    }
     default:
       button.title = 'YDD';
       break;
@@ -783,4 +784,14 @@ function onInit() {
     childList: true,
     subtree: true,
   });
+}
+
+if (window.trustedTypes && window.trustedTypes.createPolicy) {
+  try {
+    window.trustedTypes.createPolicy('default', {
+      createHTML: (string) => string,
+    });
+  } catch {
+    console.warn('Trusted Types: Default policy already exists.');
+  }
 }
