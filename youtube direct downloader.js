@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.3.3
+// @version             4.3.5
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -180,7 +180,7 @@ input[type='checkbox']:checked::after {
 }
 
 #YDD_config_downloadService_var:after {
-  content: "▲ Use cobalt_api for direct download.";
+  content: "▲ Use cobalt_api for direct download (hosted by third party and can easily run out of bandwidth).";
   display: block;
   font-family: arial, tahoma, myriad pro, sans-serif;
   font-size: 10px;
@@ -330,7 +330,8 @@ const yddCSS = `
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
-  downloadService: 'cobalt_api',
+  downloadService: 'cobalt_web',
+  backupService: 'yt5s',
   quality: 'max',
   vCodec: 'av1',
   aFormat: 'mp3',
@@ -338,7 +339,6 @@ const defaults = {
   isAudioMuted: false,
   disableMetadata: false,
   redirectShorts: false,
-  backupService: 'cobalt_web',
   showCobaltError: false,
 };
 
@@ -358,7 +358,7 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['cobalt_api', 'cobalt_web', 'yt5s', 'y2mate', 'yt1s'],
+      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'y2mate', 'yt1s'],
     },
     backupService: {
       label: 'Backup service:',
@@ -511,7 +511,7 @@ function download(isAudioOnly, downloadService) {
       break;
     case 'yt5s':
       if (isAudioOnly) window.open('https://5smp3.com/?ydd=' + encodeURI(document.location.href));
-      else window.open('https://yt5s.biz/enxj100/?ydd=' + encodeURI(document.location.href));
+      else window.open('https://yt5s.biz/enxj101/?ydd=' + encodeURI(document.location.href));
       break;
     case 'cobalt_web':
       if (isAudioOnly) window.open('https://cobalt.tools/?ydd=' + encodeURI(document.location.href) + '&audioOnly=true');
@@ -521,7 +521,7 @@ function download(isAudioOnly, downloadService) {
       if (dError) return handleCobaltError(dError, isAudioOnly);
       GM_xmlhttpRequest({
         method: 'POST',
-        url: 'https://cobalt-api.kwiatekmiki.com',
+        url: 'https://cobalt-api.kwiatekmiki.com', // Recommended: replace with your own instance
         headers: getHeaders(),
         data: JSON.stringify({
           url: encodeURI(document.location.href),
@@ -719,7 +719,7 @@ function checkPage(alternative) {
       }
       return false;
     case 'yt5s':
-      if (document.location.href.indexOf('yt5s.biz/enxj100') > -1 || document.location.href.indexOf('5smp3.com') > -1) {
+      if (document.location.href.indexOf('yt5s.biz/enxj101') > -1 || document.location.href.indexOf('5smp3.com') > -1) {
         const url = new URL(document.location.href);
         const site = url.searchParams.get('ydd');
         if (site) {
