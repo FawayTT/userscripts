@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.3.5
+// @version             4.4.0
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -298,22 +298,22 @@ const yddCSS = `
 
 @keyframes scaleIn {
   0% {
-    transform: scale(0.8) translateY(-60%);
+    transform: scale(0.8) translateY(-20%);
     opacity: 0;
   }
   100% {
-    transform: scale(1) translateY(-70%);
+    transform: scale(1) translateY(-10%);
     opacity: 1;
   }
 }
 
 @keyframes scaleOut {
   0% {
-    transform: scale(1) translateY(-70%);
+    transform: scale(1) translateY(-10%);
     opacity: 1;
   }
   100% {
-    transform: scale(0.8) translateY(-60%);
+    transform: scale(0.8) translateY(-20%);
     opacity: 0;
   }
 }
@@ -417,7 +417,7 @@ let gmc = new GM_config({
     },
     url: {
       section: ['Links'],
-      label: 'Creator of this script - FawayTT',
+      label: 'Github script page',
       type: 'button',
       click: () => {
         GM_openInTab('https://github.com/FawayTT/userscripts');
@@ -510,18 +510,21 @@ function download(isAudioOnly, downloadService) {
       else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
       break;
     case 'yt5s':
-      if (isAudioOnly) window.open('https://5smp3.com/?ydd=' + encodeURI(document.location.href));
-      else window.open('https://yt5s.biz/enxj101/?ydd=' + encodeURI(document.location.href));
+      GM_setValue('yt5sUrl', document.location.href);
+      if (isAudioOnly) window.open('https://5smp3.com/');
+      else window.open('https://yt5s.biz/');
       break;
     case 'cobalt_web':
-      if (isAudioOnly) window.open('https://cobalt.tools/?ydd=' + encodeURI(document.location.href) + '&audioOnly=true');
-      else window.open('https://cobalt.tools/?ydd=' + encodeURI(document.location.href));
+      GM_setValue('cobaltUrl', document.location.href);
+      GM_setValue('cobaltUrlAudioOnly', isAudioOnly);
+      if (isAudioOnly) window.open('https://cobalt.tools/');
+      else window.open('https://cobalt.tools/');
       break;
     default:
       if (dError) return handleCobaltError(dError, isAudioOnly);
       GM_xmlhttpRequest({
         method: 'POST',
-        url: 'https://cobalt-api.kwiatekmiki.com', // Recommended: replace with your own instance
+        url: 'https://cobalt-api.kwiatekmiki.com', // Replace with your cobalt instance
         headers: getHeaders(),
         data: JSON.stringify({
           url: encodeURI(document.location.href),
@@ -689,10 +692,11 @@ function checkPage(alternative) {
   switch (service) {
     case 'cobalt_web':
       if (document.location.href.indexOf('cobalt.tools') > -1) {
-        const url = new URL(document.location.href);
-        const site = url.searchParams.get('ydd');
-        if (site) {
-          const audioOnly = url.searchParams.get('audioOnly') === 'true';
+        const url = GM_getValue('cobaltUrl');
+        const audioOnly = GM_getValue('cobaltUrlAudioOnly');
+        if (url) {
+          GM_setValue('cobaltUrl', undefined);
+          GM_setValue('cobaltUrlAudioOnly', undefined);
           const input = document.querySelector('#link-area');
           const button = audioOnly ? document.querySelector('#setting-button-save-downloadMode-audio') : document.querySelector('#setting-button-save-downloadMode-auto');
           const loadingIcon = document.querySelector('#input-icons');
@@ -702,7 +706,7 @@ function checkPage(alternative) {
             else yddAdded = false;
           } else {
             yddAdded = true;
-            input.value = site;
+            input.value = url;
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
             button.click();
@@ -719,17 +723,17 @@ function checkPage(alternative) {
       }
       return false;
     case 'yt5s':
-      if (document.location.href.indexOf('yt5s.biz/enxj101') > -1 || document.location.href.indexOf('5smp3.com') > -1) {
-        const url = new URL(document.location.href);
-        const site = url.searchParams.get('ydd');
-        if (site) {
+      if (document.location.href.indexOf('yt5s.biz') > -1 || document.location.href.indexOf('5smp3.com') > -1) {
+        const url = GM_getValue('yt5sUrl');
+        if (url) {
+          GM_setValue('yt5sUrl', undefined);
           const input = document.querySelector('#txt-url');
           const button = document.querySelector('#btn-submit');
           if (!input || !button) {
             yddAdded = false;
           } else {
             yddAdded = true;
-            input.value = site;
+            input.value = url;
             button.click();
           }
         }
