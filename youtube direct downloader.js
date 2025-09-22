@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.4.0
-// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, y2mate, yt1s, yt5s) in settings.
+// @version             4.4.1
+// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, yt5s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @supportURL          https://github.com/FawayTT/userscripts/issues
 // @icon                https://github.com/FawayTT/userscripts/blob/main/ydd-icon.png?raw=true
-// @match               https://www.youtube.com/*
-// @match               https://yt5s.biz/*
-// @match               https://cobalt.tools/*
-// @match               https://5smp3.com/*
+// @match               *://www.youtube.com/*
+// @match               *://yt5s.biz/*
+// @match               *://cobalt.tools/*
+// @match               *://5smp3.com/*
 // @connect             cobalt-api.kwiatekmiki.com
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
@@ -18,6 +18,7 @@
 // @grant               GM_openInTab
 // @grant               GM_xmlhttpRequest
 // @license             MIT
+// @run-at              document-end
 // ==/UserScript==
 
 const gmcCSS = `
@@ -330,8 +331,8 @@ const yddCSS = `
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
-  downloadService: 'cobalt_web',
-  backupService: 'yt5s',
+  downloadService: 'yt5s',
+  backupService: 'cobalt_web',
   quality: 'max',
   vCodec: 'av1',
   aFormat: 'mp3',
@@ -344,7 +345,7 @@ const defaults = {
 
 let frame = document.createElement('div');
 document.body.appendChild(frame);
-let cobaltTries = 0;
+let checkIndex = 0;
 
 let gmc = new GM_config({
   id: 'YDD_config',
@@ -358,13 +359,13 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'y2mate', 'yt1s'],
+      options: ['cobalt_web', 'cobalt_api', 'yt5s'],
     },
     backupService: {
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: ['cobalt_web', 'cobalt_api', 'y2mate', 'yt5s', 'yt1s', 'none'],
+      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'none'],
     },
     quality: {
       section: ['Cobalt API settings'],
@@ -501,14 +502,6 @@ function handleCobaltError(errorMessage, isAudioOnly) {
 function download(isAudioOnly, downloadService) {
   if (!downloadService) downloadService = gmc.get('downloadService');
   switch (downloadService) {
-    case 'y2mate':
-      if (isAudioOnly) window.open(`https://www.y2mate.com/youtube-mp3/${getYouTubeVideoID(document.location.href)}`);
-      else window.open(`https://www.y2mate.com/download-youtube/${getYouTubeVideoID(document.location.href)}`);
-      break;
-    case 'yt1s':
-      if (isAudioOnly) window.open(`https://www.yt1s.com/en/youtube-to-mp3?q=${getYouTubeVideoID(document.location.href)}`);
-      else window.open(`https://www.yt1s.com/en/youtube-to-mp4?q=${getYouTubeVideoID(document.location.href)}`);
-      break;
     case 'yt5s':
       GM_setValue('yt5sUrl', document.location.href);
       if (isAudioOnly) window.open('https://5smp3.com/');
@@ -642,12 +635,6 @@ function createButton(bar, short) {
 
   let downloadService = gmc.get('downloadService') || defaults.downloadService;
   switch (downloadService) {
-    case 'y2mate':
-      button.title = 'Y2Mate';
-      break;
-    case 'yt1s':
-      button.title = 'YT1S';
-      break;
     case 'yt5s':
       button.title = 'YT5S';
       break;
@@ -701,8 +688,8 @@ function checkPage(alternative) {
           const button = audioOnly ? document.querySelector('#setting-button-save-downloadMode-audio') : document.querySelector('#setting-button-save-downloadMode-auto');
           const loadingIcon = document.querySelector('#input-icons');
           if (!input || !button || !loadingIcon) {
-            cobaltTries++;
-            if (cobaltTries > 10) yddAdded = true;
+            checkIndex++;
+            if (checkIndex > 10) yddAdded = true;
             else yddAdded = false;
           } else {
             yddAdded = true;
