@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.4.1
-// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, yt5s) in settings.
+// @version             4.5
+// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, yt5s, yt1s) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @supportURL          https://github.com/FawayTT/userscripts/issues
@@ -10,6 +10,7 @@
 // @match               *://yt5s.biz/*
 // @match               *://cobalt.tools/*
 // @match               *://5smp3.com/*
+// @match               *://*.yt1s.biz/*
 // @connect             cobalt-api.kwiatekmiki.com
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
@@ -332,7 +333,7 @@ GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
   downloadService: 'yt5s',
-  backupService: 'cobalt_web',
+  backupService: 'yt1s',
   quality: 'max',
   vCodec: 'av1',
   aFormat: 'mp3',
@@ -346,6 +347,8 @@ const defaults = {
 let frame = document.createElement('div');
 document.body.appendChild(frame);
 let checkIndex = 0;
+let observerExecuted = false;
+const maxChecks = 10;
 
 let gmc = new GM_config({
   id: 'YDD_config',
@@ -359,13 +362,13 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['cobalt_web', 'cobalt_api', 'yt5s'],
+      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'yt1s'],
     },
     backupService: {
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'none'],
+      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'yt1s', 'none'],
     },
     quality: {
       section: ['Cobalt API settings'],
@@ -504,8 +507,13 @@ function download(isAudioOnly, downloadService) {
   switch (downloadService) {
     case 'yt5s':
       GM_setValue('yt5sUrl', document.location.href);
-      if (isAudioOnly) window.open('https://5smp3.com/');
+      if (isAudioOnly) window.open('https://5smp3.com/watch');
       else window.open('https://yt5s.biz/');
+      break;
+    case 'yt1s':
+      GM_setValue('yt1sUrl', document.location.href);
+      if (isAudioOnly) window.open('https://5smp3.com/watch');
+      else window.open('https://yt1s.biz/');
       break;
     case 'cobalt_web':
       GM_setValue('cobaltUrl', document.location.href);
@@ -674,6 +682,18 @@ function checkShort(replace = true) {
   } else return false;
 }
 
+function setInput(input, value) {
+  const inputSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  inputSetter.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function retry() {
+  checkIndex++;
+  if (checkIndex > maxChecks) yddAdded = true;
+  else yddAdded = false;
+}
+
 function checkPage(alternative) {
   const service = alternative ? gmc.get('backupService') : gmc.get('downloadService');
   switch (service) {
@@ -688,14 +708,10 @@ function checkPage(alternative) {
           const button = audioOnly ? document.querySelector('#setting-button-save-downloadMode-audio') : document.querySelector('#setting-button-save-downloadMode-auto');
           const loadingIcon = document.querySelector('#input-icons');
           if (!input || !button || !loadingIcon) {
-            checkIndex++;
-            if (checkIndex > 10) yddAdded = true;
-            else yddAdded = false;
+            retry();
           } else {
             yddAdded = true;
-            input.value = url;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+            setInput(input, url);
             button.click();
             const observer = new MutationObserver(function () {
               if (loadingIcon.classList.contains('loading') || !loadingIcon) return;
@@ -710,18 +726,49 @@ function checkPage(alternative) {
       }
       return false;
     case 'yt5s':
-      if (document.location.href.indexOf('yt5s.biz') > -1 || document.location.href.indexOf('5smp3.com') > -1) {
+      if (document.location.href.indexOf('yt5s.biz') > -1) {
         const url = GM_getValue('yt5sUrl');
         if (url) {
           GM_setValue('yt5sUrl', undefined);
           const input = document.querySelector('#txt-url');
           const button = document.querySelector('#btn-submit');
           if (!input || !button) {
-            yddAdded = false;
+            retry();
+          } else {
+            yddAdded = true;
+            setInput(input, url);
+            button.click();
+          }
+        }
+        return true;
+      } else if (document.location.href.indexOf('5smp3.com') > -1) {
+        const url = GM_getValue('yt5sUrl');
+        if (url) {
+          GM_setValue('yt5sUrl', undefined);
+          const input = document.querySelector('#inputUrl');
+          const button = document.querySelector('.btn-icon.rounded-pill');
+          if (!input || !button) {
+            retry();
           } else {
             yddAdded = true;
             input.value = url;
             button.click();
+          }
+        }
+        return true;
+      }
+      return false;
+    case 'yt1s':
+      if (document.location.href.indexOf('yt1s.biz') > -1) {
+        const url = GM_getValue('yt1sUrl');
+        if (url) {
+          GM_setValue('yt1sUrl', undefined);
+          const input = document.querySelector('.index-module--search--fb2ee');
+          if (!input) {
+            retry();
+          } else {
+            yddAdded = true;
+            setInput(input, url);
           }
         }
         return true;
@@ -765,6 +812,7 @@ function modify() {
 function onInit() {
   addStyles();
   const observer = new MutationObserver(function () {
+    observerExecuted = true;
     if (!yddAdded) return modify();
     if (oldHref != document.location.href) {
       oldHref = document.location.href;
@@ -775,6 +823,9 @@ function onInit() {
     childList: true,
     subtree: true,
   });
+  setTimeout(() => {
+    if (!observerExecuted) modify();
+  }, 500);
 }
 
 if (window.trustedTypes && window.trustedTypes.createPolicy) {
