@@ -21,8 +21,6 @@
 // @grant               GM_xmlhttpRequest
 // @license             MIT
 // @run-at              document-end
-// @downloadURL https://update.greasyfork.org/scripts/481954/YouTube%20Direct%20Downloader.user.js
-// @updateURL https://update.greasyfork.org/scripts/481954/YouTube%20Direct%20Downloader.meta.js
 // ==/UserScript==
 
 const gmcCSS = `
@@ -332,7 +330,7 @@ const yddCSS = `
 }
 `;
 
-console.log("Running YDD");
+console.log('Running YDD');
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
@@ -348,8 +346,6 @@ const defaults = {
   showCobaltError: false,
 };
 
-while (document.body == null)
-  {}
 let frame = document.createElement('div');
 document.body.appendChild(frame);
 let checkIndex = 0;
@@ -509,7 +505,7 @@ function handleCobaltError(errorMessage, isAudioOnly) {
 }
 
 function download(isAudioOnly, downloadService) {
-  console.log("Attempting download with " + downloadService);
+  console.log('Attempting download with ' + downloadService);
   if (!downloadService) downloadService = gmc.get('downloadService');
   switch (downloadService) {
     case 'yt5s':
@@ -519,7 +515,7 @@ function download(isAudioOnly, downloadService) {
       break;
     case 'ytmp3':
       GM_setValue('ytmp3Url', document.location.href);
-      GM_setValue('isAudioOnly', isAudioOnly);
+      GM_setValue('ytmp3AudioOnly', isAudioOnly);
       window.open('https://ytmp3.cc/');
       break;
     case 'yt1s':
@@ -788,25 +784,28 @@ function checkPage(alternative) {
         }
         return true;
       }
-      case 'ytmp3':
+    case 'ytmp3':
+      if (document.location.href.indexOf('ytmp3') > -1) {
         const url = GM_getValue('ytmp3Url');
+        const audioOnly = GM_getValue('ytmp3AudioOnly');
         if (url) {
           GM_setValue('ytmp3Url', undefined);
+          GM_setValue('ytmp3AudioOnly', undefined);
           const input = document.querySelector('input[id="v"]');
-          //swaps radio button for audio format
-          document.querySelectorAll('button:not(#submit)')[GM_getValue('isAudioOnly') ? 0 : 1].id = "selected";
-          document.querySelectorAll('button:not(#submit)')[GM_getValue('isAudioOnly') ? 1 : 0].id = "";
-          if (!input) {
+          const button = document.querySelector("button[type='submit']");
+          if (!input || !button) {
             retry();
           } else {
             yddAdded = true;
+            // Swaps radio button for audio format
+            document.querySelectorAll('button:not(#submit)')[audioOnly ? 0 : 1].id = 'selected';
+            document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].id = '';
             setInput(input, url);
+            button.click();
           }
-          const button = document.querySelector("button[type='submit']");
-          button.click();
-          return true;
         }
-      return false;
+        return true;
+      }
     default:
       return false;
   }
@@ -844,7 +843,6 @@ function modify() {
 
 function onInit() {
   addStyles();
-  modify();
   const observer = new MutationObserver(function () {
     observerExecuted = true;
     if (!yddAdded) return modify();
