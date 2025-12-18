@@ -11,6 +11,7 @@
 // @match               *://cobalt.tools/*
 // @match               *://5smp3.com/*
 // @match               *://*.yt1s.biz/*
+// @match               *://ytmp3.*/*
 // @connect             cobalt-api.kwiatekmiki.com
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
@@ -329,6 +330,7 @@ const yddCSS = `
 }
 `;
 
+console.log('Running YDD');
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
@@ -362,13 +364,13 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'yt1s'],
+      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'yt1s', 'ytmp3'],
     },
     backupService: {
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'yt1s', 'none'],
+      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'yt1s', 'ytmp3', 'none'],
     },
     quality: {
       section: ['Cobalt API settings'],
@@ -503,12 +505,18 @@ function handleCobaltError(errorMessage, isAudioOnly) {
 }
 
 function download(isAudioOnly, downloadService) {
+  console.log('Attempting download with ' + downloadService);
   if (!downloadService) downloadService = gmc.get('downloadService');
   switch (downloadService) {
     case 'yt5s':
       GM_setValue('yt5sUrl', document.location.href);
       if (isAudioOnly) window.open('https://5smp3.com/watch');
       else window.open('https://yt5s.biz/');
+      break;
+    case 'ytmp3':
+      GM_setValue('ytmp3Url', document.location.href);
+      GM_setValue('ytmp3AudioOnly', isAudioOnly);
+      window.open('https://ytmp3.cc/');
       break;
     case 'yt1s':
       GM_setValue('yt1sUrl', document.location.href);
@@ -646,6 +654,9 @@ function createButton(bar, short) {
     case 'yt5s':
       button.title = 'YT5S';
       break;
+    case 'ytmp3':
+      button.title = 'YTMP3';
+      break;
     case 'cobalt_web':
       button.title = 'Cobalt';
       break;
@@ -773,7 +784,28 @@ function checkPage(alternative) {
         }
         return true;
       }
-      return false;
+    case 'ytmp3':
+      if (document.location.href.indexOf('ytmp3') > -1) {
+        const url = GM_getValue('ytmp3Url');
+        const audioOnly = GM_getValue('ytmp3AudioOnly');
+        if (url) {
+          GM_setValue('ytmp3Url', undefined);
+          GM_setValue('ytmp3AudioOnly', undefined);
+          const input = document.querySelector('input[id="v"]');
+          const button = document.querySelector("button[type='submit']");
+          if (!input || !button) {
+            retry();
+          } else {
+            yddAdded = true;
+            // Swaps radio button for audio format
+            document.querySelectorAll('button:not(#submit)')[audioOnly ? 0 : 1].id = 'selected';
+            document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].id = '';
+            setInput(input, url);
+            button.click();
+          }
+        }
+        return true;
+      }
     default:
       return false;
   }
