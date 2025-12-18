@@ -1,17 +1,17 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             4.5
-// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, yt5s, yt1s) in settings.
+// @version             5.0
+// @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, yt5s, yt1s, ytmp3) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
 // @supportURL          https://github.com/FawayTT/userscripts/issues
 // @icon                https://github.com/FawayTT/userscripts/blob/main/ydd-icon.png?raw=true
-// @match               *://www.youtube.com/*
-// @match               *://yt5s.biz/*
-// @match               *://cobalt.tools/*
-// @match               *://5smp3.com/*
+// @match               *://*.youtube.com/*
+// @match               *://*.yt5s.in/*
+// @match               *://*.cobalt.tools/*
+// @match               *://*.5smp3.com/*
 // @match               *://*.yt1s.biz/*
-// @match               *://ytmp3.*/*
+// @match               *://*.ytmp3.ai/*
 // @connect             cobalt-api.kwiatekmiki.com
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
@@ -333,16 +333,29 @@ const yddCSS = `
 
 console.log('Running YDD');
 
-const downloadServices = {
+const defaults = {
+  downloadService: 'yt5s',
+  backupService: 'yt1s',
+  quality: 'max',
+  vCodec: 'av1',
+  aFormat: 'mp3',
+  filenamePattern: 'basic',
+  isAudioMuted: false,
+  disableMetadata: false,
+  redirectShorts: false,
+  showCobaltError: false,
+};
+
+const donwloadServices = {
   yt5s: {
     title: 'YT5S',
     download: (isAudioOnly) => {
       GM_setValue('yt5sUrl', document.location.href);
-      if (isAudioOnly) window.open('https://5smp3.com/watch');
-      else window.open('https://yt5s.biz/');
+      if (isAudioOnly) extraDownloadServices['5smp3'].download();
+      else window.open('https://yt5s.in/');
     },
     checkPage: () => {
-      if (document.location.href.indexOf('yt5s.biz') > -1) {
+      if (document.location.href.indexOf('yt5s.in') > -1) {
         const url = GM_getValue('yt5sUrl');
         if (url) {
           const input = document.querySelector('#txt-url');
@@ -357,23 +370,8 @@ const downloadServices = {
           }
         }
         return true;
-      } else if (document.location.href.indexOf('5smp3.com') > -1) {
-        const url = GM_getValue('yt5sUrl');
-        if (url) {
-          const input = document.querySelector('#inputUrl');
-          const button = document.querySelector('.btn-icon.rounded-pill');
-          if (!input || !button) {
-            retry();
-          } else {
-            GM_deleteValue('yt5sUrl');
-            yddAdded = true;
-            input.value = url;
-            button.click();
-          }
-        }
-        return true;
       }
-      return false;
+      return extraDownloadServices['5smp3'].checkPage();
     },
   },
   ytmp3: {
@@ -381,10 +379,10 @@ const downloadServices = {
     download: (isAudioOnly) => {
       GM_setValue('ytmp3Url', document.location.href);
       GM_setValue('ytmp3AudioOnly', isAudioOnly);
-      window.open('https://ytmp3.cc/');
+      window.open('https://ytmp3.ai/');
     },
     checkPage: () => {
-      if (document.location.href.indexOf('ytmp3') > -1) {
+      if (document.location.href.indexOf('ytmp3.ai') > -1) {
         const url = GM_getValue('ytmp3Url');
         const audioOnly = GM_getValue('ytmp3AudioOnly');
         if (url) {
@@ -413,7 +411,7 @@ const downloadServices = {
     title: 'YT1S',
     download: (isAudioOnly) => {
       GM_setValue('yt1sUrl', document.location.href);
-      if (isAudioOnly) window.open('https://5smp3.com/watch');
+      if (isAudioOnly) extraDownloadServices['5smp3'].download();
       else window.open('https://yt1s.biz/');
     },
     checkPage: () => {
@@ -421,17 +419,19 @@ const downloadServices = {
         const url = GM_getValue('yt1sUrl');
         if (url) {
           const input = document.querySelector('.index-module--search--fb2ee');
-          if (!input) {
+          const button = document.querySelector('.index-module--button--62cd9');
+          if (!input || !button) {
             retry();
           } else {
             GM_deleteValue('yt1sUrl');
             yddAdded = true;
             setInput(input, url);
+            button.click();
           }
         }
         return true;
       }
-      return false;
+      return extraDownloadServices['5smp3'].checkPage();
     },
   },
   cobalt_web: {
@@ -519,23 +519,46 @@ const downloadServices = {
     },
   },
 };
-GM_registerMenuCommand('Settings', opencfg);
 
-const defaults = {
-  downloadService: 'yt5s',
-  backupService: 'yt1s',
-  quality: 'max',
-  vCodec: 'av1',
-  aFormat: 'mp3',
-  filenamePattern: 'basic',
-  isAudioMuted: false,
-  disableMetadata: false,
-  redirectShorts: false,
-  showCobaltError: false,
+const extraDownloadServices = {
+  '5smp3': {
+    title: '5smp3',
+    download: () => {
+      GM_setValue('5smp3Url', document.location.href);
+      window.open('https://5smp3.com/watch');
+    },
+    checkPage: () => {
+      if (document.location.href.indexOf('5smp3.com') > -1) {
+        const url = GM_getValue('5smp3Url');
+        if (url) {
+          const input = document.querySelector('#inputUrl');
+          const button = document.querySelector('.btn-icon.rounded-pill');
+          if (!input || !button) {
+            retry();
+          } else {
+            GM_deleteValue('5smp3Url');
+            yddAdded = true;
+            input.value = url;
+            button.click();
+          }
+        }
+        return true;
+      }
+      return false;
+    },
+  },
+  downsub: {
+    title: 'Downsub',
+    download: () => {
+      window.open(`https://downsub.com/?url=${document.location.href}`);
+    },
+    checkPage: () => {},
+  },
 };
 
+GM_registerMenuCommand('Settings', opencfg);
+
 let frame = document.createElement('div');
-document.body.appendChild(frame);
 let checkIndex = 0;
 let observerExecuted = false;
 const maxChecks = 10;
@@ -552,13 +575,13 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: Object.keys(downloadServices),
+      options: Object.keys(donwloadServices),
     },
     backupService: {
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: [...Object.keys(downloadServices), 'none'],
+      options: [...Object.keys(donwloadServices), 'none'],
     },
     quality: {
       section: ['Cobalt API settings'],
@@ -638,7 +661,10 @@ let gmc = new GM_config({
       deleteButtons();
       modify();
     },
-    init: onInit,
+    init: function () {
+      if (document.body) return onInit();
+      document.addEventListener('DOMContentLoaded', onInit, { once: true });
+    },
   },
 });
 
@@ -693,10 +719,10 @@ function handleCobaltError(errorMessage, isAudioOnly) {
 }
 
 function download(isAudioOnly, downloadService) {
-  console.log('Attempting download with ' + downloadService);
   if (!downloadService) downloadService = gmc.get('downloadService');
-  if (downloadServices[downloadService]) {
-    downloadServices[downloadService].download(isAudioOnly);
+  console.log('Attempting download with ' + downloadService);
+  if (donwloadServices[downloadService]) {
+    donwloadServices[downloadService].download(isAudioOnly);
   } else {
     console.error('Download service not found: ' + downloadService);
   }
@@ -753,7 +779,7 @@ function showOptions(div) {
     closeOptions(optionsDiv);
   });
   subtitles.addEventListener('click', () => {
-    window.open(`https://downsub.com/?url=${document.location.href}`);
+    extraDownloadServices['downsub'].download();
     closeOptions(optionsDiv);
   });
   window.addEventListener('click', (e) => {
@@ -780,8 +806,8 @@ function createButton(bar, short) {
   } else bar.appendChild(div);
 
   let downloadService = gmc.get('downloadService') || defaults.downloadService;
-  if (downloadServices[downloadService] && downloadServices[downloadService].title) {
-    button.title = downloadServices[downloadService].title;
+  if (donwloadServices[downloadService] && donwloadServices[downloadService].title) {
+    button.title = donwloadServices[downloadService].title;
   } else {
     button.title = 'YDD';
   }
@@ -821,7 +847,7 @@ function retry() {
 
 function checkPage(alternative) {
   const serviceName = alternative ? gmc.get('backupService') : gmc.get('downloadService');
-  const service = downloadServices[serviceName];
+  const service = donwloadServices[serviceName];
   if (service && service.checkPage) {
     return service.checkPage();
   }
@@ -860,6 +886,8 @@ function modify() {
 
 function onInit() {
   addStyles();
+  document.body.appendChild(frame);
+
   const observer = new MutationObserver(function () {
     observerExecuted = true;
     if (!yddAdded) return modify();
