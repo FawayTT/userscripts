@@ -16,6 +16,7 @@
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
 // @grant               GM_setValue
+// @grant               GM_deleteValue
 // @grant               GM_registerMenuCommand
 // @grant               GM_openInTab
 // @grant               GM_xmlhttpRequest
@@ -526,8 +527,7 @@ function download(isAudioOnly, downloadService) {
     case 'cobalt_web':
       GM_setValue('cobaltUrl', document.location.href);
       GM_setValue('cobaltUrlAudioOnly', isAudioOnly);
-      if (isAudioOnly) window.open('https://cobalt.tools/');
-      else window.open('https://cobalt.tools/');
+      window.open('https://cobalt.tools/');
       break;
     default:
       if (dError) return handleCobaltError(dError, isAudioOnly);
@@ -713,14 +713,14 @@ function checkPage(alternative) {
         const url = GM_getValue('cobaltUrl');
         const audioOnly = GM_getValue('cobaltUrlAudioOnly');
         if (url) {
-          GM_setValue('cobaltUrl', undefined);
-          GM_setValue('cobaltUrlAudioOnly', undefined);
           const input = document.querySelector('#link-area');
           const button = audioOnly ? document.querySelector('#setting-button-save-downloadMode-audio') : document.querySelector('#setting-button-save-downloadMode-auto');
           const loadingIcon = document.querySelector('#input-icons');
           if (!input || !button || !loadingIcon) {
             retry();
           } else {
+            GM_deleteValue('cobaltUrl');
+            GM_deleteValue('cobaltUrlAudioOnly');
             yddAdded = true;
             setInput(input, url);
             button.click();
@@ -740,12 +740,12 @@ function checkPage(alternative) {
       if (document.location.href.indexOf('yt5s.biz') > -1) {
         const url = GM_getValue('yt5sUrl');
         if (url) {
-          GM_setValue('yt5sUrl', undefined);
           const input = document.querySelector('#txt-url');
           const button = document.querySelector('#btn-submit');
           if (!input || !button) {
             retry();
           } else {
+            GM_deleteValue('yt5sUrl');
             yddAdded = true;
             setInput(input, url);
             button.click();
@@ -755,12 +755,12 @@ function checkPage(alternative) {
       } else if (document.location.href.indexOf('5smp3.com') > -1) {
         const url = GM_getValue('yt5sUrl');
         if (url) {
-          GM_setValue('yt5sUrl', undefined);
           const input = document.querySelector('#inputUrl');
           const button = document.querySelector('.btn-icon.rounded-pill');
           if (!input || !button) {
             retry();
           } else {
+            GM_deleteValue('yt5sUrl');
             yddAdded = true;
             input.value = url;
             button.click();
@@ -773,11 +773,11 @@ function checkPage(alternative) {
       if (document.location.href.indexOf('yt1s.biz') > -1) {
         const url = GM_getValue('yt1sUrl');
         if (url) {
-          GM_setValue('yt1sUrl', undefined);
           const input = document.querySelector('.index-module--search--fb2ee');
           if (!input) {
             retry();
           } else {
+            GM_deleteValue('yt1sUrl');
             yddAdded = true;
             setInput(input, url);
           }
@@ -789,18 +789,19 @@ function checkPage(alternative) {
         const url = GM_getValue('ytmp3Url');
         const audioOnly = GM_getValue('ytmp3AudioOnly');
         if (url) {
-          GM_setValue('ytmp3Url', undefined);
-          GM_setValue('ytmp3AudioOnly', undefined);
           const input = document.querySelector('input[id="v"]');
           const button = document.querySelector("button[type='submit']");
           if (!input || !button) {
             retry();
           } else {
+            GM_deleteValue('ytmp3Url');
+            GM_deleteValue('ytmp3AudioOnly');
             yddAdded = true;
+            setInput(input, url);
             // Swaps radio button for audio format
             document.querySelectorAll('button:not(#submit)')[audioOnly ? 0 : 1].id = 'selected';
             document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].id = '';
-            setInput(input, url);
+
             button.click();
           }
         }
