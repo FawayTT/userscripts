@@ -332,6 +332,193 @@ const yddCSS = `
 `;
 
 console.log('Running YDD');
+
+const downloadServices = {
+  yt5s: {
+    title: 'YT5S',
+    download: (isAudioOnly) => {
+      GM_setValue('yt5sUrl', document.location.href);
+      if (isAudioOnly) window.open('https://5smp3.com/watch');
+      else window.open('https://yt5s.biz/');
+    },
+    checkPage: () => {
+      if (document.location.href.indexOf('yt5s.biz') > -1) {
+        const url = GM_getValue('yt5sUrl');
+        if (url) {
+          const input = document.querySelector('#txt-url');
+          const button = document.querySelector('#btn-submit');
+          if (!input || !button) {
+            retry();
+          } else {
+            GM_deleteValue('yt5sUrl');
+            yddAdded = true;
+            setInput(input, url);
+            button.click();
+          }
+        }
+        return true;
+      } else if (document.location.href.indexOf('5smp3.com') > -1) {
+        const url = GM_getValue('yt5sUrl');
+        if (url) {
+          const input = document.querySelector('#inputUrl');
+          const button = document.querySelector('.btn-icon.rounded-pill');
+          if (!input || !button) {
+            retry();
+          } else {
+            GM_deleteValue('yt5sUrl');
+            yddAdded = true;
+            input.value = url;
+            button.click();
+          }
+        }
+        return true;
+      }
+      return false;
+    },
+  },
+  ytmp3: {
+    title: 'YTMP3',
+    download: (isAudioOnly) => {
+      GM_setValue('ytmp3Url', document.location.href);
+      GM_setValue('ytmp3AudioOnly', isAudioOnly);
+      window.open('https://ytmp3.cc/');
+    },
+    checkPage: () => {
+      if (document.location.href.indexOf('ytmp3') > -1) {
+        const url = GM_getValue('ytmp3Url');
+        const audioOnly = GM_getValue('ytmp3AudioOnly');
+        if (url) {
+          const input = document.querySelector('input[id="v"]');
+          const button = document.querySelector("button[type='submit']");
+          if (!input || !button) {
+            retry();
+          } else {
+            GM_deleteValue('ytmp3Url');
+            GM_deleteValue('ytmp3AudioOnly');
+            yddAdded = true;
+            setInput(input, url);
+            // Swaps radio button for audio format
+            document.querySelectorAll('button:not(#submit)')[audioOnly ? 0 : 1].id = 'selected';
+            document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].id = '';
+
+            button.click();
+          }
+        }
+        return true;
+      }
+      return false;
+    },
+  },
+  yt1s: {
+    title: 'YT1S',
+    download: (isAudioOnly) => {
+      GM_setValue('yt1sUrl', document.location.href);
+      if (isAudioOnly) window.open('https://5smp3.com/watch');
+      else window.open('https://yt1s.biz/');
+    },
+    checkPage: () => {
+      if (document.location.href.indexOf('yt1s.biz') > -1) {
+        const url = GM_getValue('yt1sUrl');
+        if (url) {
+          const input = document.querySelector('.index-module--search--fb2ee');
+          if (!input) {
+            retry();
+          } else {
+            GM_deleteValue('yt1sUrl');
+            yddAdded = true;
+            setInput(input, url);
+          }
+        }
+        return true;
+      }
+      return false;
+    },
+  },
+  cobalt_web: {
+    title: 'Cobalt WEB',
+    download: (isAudioOnly) => {
+      GM_setValue('cobaltUrl', document.location.href);
+      GM_setValue('cobaltUrlAudioOnly', isAudioOnly);
+      window.open('https://cobalt.tools/');
+    },
+    checkPage: () => {
+      if (document.location.href.indexOf('cobalt.tools') > -1) {
+        const url = GM_getValue('cobaltUrl');
+        const audioOnly = GM_getValue('cobaltUrlAudioOnly');
+        if (url) {
+          const input = document.querySelector('#link-area');
+          const button = audioOnly ? document.querySelector('#setting-button-save-downloadMode-audio') : document.querySelector('#setting-button-save-downloadMode-auto');
+          const loadingIcon = document.querySelector('#input-icons');
+          if (!input || !button || !loadingIcon) {
+            retry();
+          } else {
+            GM_deleteValue('cobaltUrl');
+            GM_deleteValue('cobaltUrlAudioOnly');
+            yddAdded = true;
+            setInput(input, url);
+            button.click();
+            const observer = new MutationObserver(function () {
+              if (loadingIcon.classList.contains('loading') || !loadingIcon) return;
+              const dwnButton = document.querySelector('#download-button');
+              dwnButton.click();
+              observer.disconnect();
+            });
+            observer.observe(loadingIcon, { attributes: true, attributeFilter: ['class'] });
+          }
+        }
+        return true;
+      }
+      return false;
+    },
+  },
+  cobalt_api: {
+    get title() {
+      const quality = gmc.get('quality') || defaults.quality;
+      const vCodec = gmc.get('vCodec') || defaults.vCodec;
+      return 'Cobalt: ' + quality + ', ' + vCodec;
+    },
+    download: (isAudioOnly) => {
+      if (dError) return handleCobaltError(dError, isAudioOnly);
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url: 'https://cobalt-api.kwiatekmiki.com', // Replace with your cobalt instance
+        headers: getHeaders(),
+        data: JSON.stringify({
+          url: encodeURI(document.location.href),
+          videoQuality: gmc.get('quality'),
+          youtubeVideoCodec: gmc.get('vCodec'),
+          audioFormat: gmc.get('aFormat'),
+          filenameStyle: gmc.get('filenamePattern'),
+          disableMetadata: gmc.get('disableMetadata'),
+          downloadMode: isAudioOnly ? 'audio' : `${gmc.get('isAudioMuted') ? 'muted' : 'auto'}`,
+        }),
+        onload: (response) => {
+          const data = response.responseText && JSON.parse(response.responseText);
+          if (response.status === 200) {
+            if (data.url) window.open(data.url);
+            else handleCobaltError('Cobalt is not sending expected response.', isAudioOnly);
+          } else if (response.status === 403) {
+            handleCobaltError('Cobalt is blocking your request with Bot Protection.', isAudioOnly);
+          } else {
+            handleCobaltError(`Something went wrong! Try again later. (${data.error.code || data.text || data.statusText || ''})`, isAudioOnly);
+          }
+        },
+        onerror: function (error) {
+          handleCobaltError(error.message || error, isAudioOnly);
+        },
+        ontimeout: function () {
+          handleCobaltError('Cobalt is not responding. Please try again later.', isAudioOnly);
+        },
+      });
+
+      clearTimeout(dTimeout);
+      dError = 'Slow down.';
+      dTimeout = setTimeout(() => {
+        dError = null;
+      }, 5000);
+    },
+  },
+};
 GM_registerMenuCommand('Settings', opencfg);
 
 const defaults = {
@@ -365,13 +552,13 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'yt1s', 'ytmp3'],
+      options: Object.keys(downloadServices),
     },
     backupService: {
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: ['cobalt_web', 'cobalt_api', 'yt5s', 'yt1s', 'ytmp3', 'none'],
+      options: [...Object.keys(downloadServices), 'none'],
     },
     quality: {
       section: ['Cobalt API settings'],
@@ -508,67 +695,10 @@ function handleCobaltError(errorMessage, isAudioOnly) {
 function download(isAudioOnly, downloadService) {
   console.log('Attempting download with ' + downloadService);
   if (!downloadService) downloadService = gmc.get('downloadService');
-  switch (downloadService) {
-    case 'yt5s':
-      GM_setValue('yt5sUrl', document.location.href);
-      if (isAudioOnly) window.open('https://5smp3.com/watch');
-      else window.open('https://yt5s.biz/');
-      break;
-    case 'ytmp3':
-      GM_setValue('ytmp3Url', document.location.href);
-      GM_setValue('ytmp3AudioOnly', isAudioOnly);
-      window.open('https://ytmp3.cc/');
-      break;
-    case 'yt1s':
-      GM_setValue('yt1sUrl', document.location.href);
-      if (isAudioOnly) window.open('https://5smp3.com/watch');
-      else window.open('https://yt1s.biz/');
-      break;
-    case 'cobalt_web':
-      GM_setValue('cobaltUrl', document.location.href);
-      GM_setValue('cobaltUrlAudioOnly', isAudioOnly);
-      window.open('https://cobalt.tools/');
-      break;
-    default:
-      if (dError) return handleCobaltError(dError, isAudioOnly);
-      GM_xmlhttpRequest({
-        method: 'POST',
-        url: 'https://cobalt-api.kwiatekmiki.com', // Replace with your cobalt instance
-        headers: getHeaders(),
-        data: JSON.stringify({
-          url: encodeURI(document.location.href),
-          videoQuality: gmc.get('quality'),
-          youtubeVideoCodec: gmc.get('vCodec'),
-          audioFormat: gmc.get('aFormat'),
-          filenameStyle: gmc.get('filenamePattern'),
-          disableMetadata: gmc.get('disableMetadata'),
-          downloadMode: isAudioOnly ? 'audio' : `${gmc.get('isAudioMuted') ? 'muted' : 'auto'}`,
-        }),
-        onload: (response) => {
-          const data = response.responseText && JSON.parse(response.responseText);
-          if (response.status === 200) {
-            if (data.url) window.open(data.url);
-            else handleCobaltError('Cobalt is not sending expected response.', isAudioOnly);
-          } else if (response.status === 403) {
-            handleCobaltError('Cobalt is blocking your request with Bot Protection.', isAudioOnly);
-          } else {
-            handleCobaltError(`Something went wrong! Try again later. (${data.error.code || data.text || data.statusText || ''})`, isAudioOnly);
-          }
-        },
-        onerror: function (error) {
-          handleCobaltError(error.message || error, isAudioOnly);
-        },
-        ontimeout: function () {
-          handleCobaltError('Cobalt is not responding. Please try again later.', isAudioOnly);
-        },
-      });
-
-      clearTimeout(dTimeout);
-      dError = 'Slow down.';
-      dTimeout = setTimeout(() => {
-        dError = null;
-      }, 5000);
-      break;
+  if (downloadServices[downloadService]) {
+    downloadServices[downloadService].download(isAudioOnly);
+  } else {
+    console.error('Download service not found: ' + downloadService);
   }
 }
 
@@ -650,26 +780,10 @@ function createButton(bar, short) {
   } else bar.appendChild(div);
 
   let downloadService = gmc.get('downloadService') || defaults.downloadService;
-  switch (downloadService) {
-    case 'yt5s':
-      button.title = 'YT5S';
-      break;
-    case 'ytmp3':
-      button.title = 'YTMP3';
-      break;
-    case 'cobalt_web':
-      button.title = 'Cobalt';
-      break;
-    case 'cobalt_api': {
-      const quality = gmc.get('quality') || defaults.quality;
-      const vCodec = gmc.get('vCodec') || defaults.vCodec;
-      const info = `${quality}, ${vCodec}`;
-      button.title = 'Cobalt: ' + info.toUpperCase();
-      break;
-    }
-    default:
-      button.title = 'YDD';
-      break;
+  if (downloadServices[downloadService] && downloadServices[downloadService].title) {
+    button.title = downloadServices[downloadService].title;
+  } else {
+    button.title = 'YDD';
   }
   button.innerText = '⇩';
   options.innerText = '☰';
@@ -706,110 +820,12 @@ function retry() {
 }
 
 function checkPage(alternative) {
-  const service = alternative ? gmc.get('backupService') : gmc.get('downloadService');
-  switch (service) {
-    case 'cobalt_web':
-      if (document.location.href.indexOf('cobalt.tools') > -1) {
-        const url = GM_getValue('cobaltUrl');
-        const audioOnly = GM_getValue('cobaltUrlAudioOnly');
-        if (url) {
-          const input = document.querySelector('#link-area');
-          const button = audioOnly ? document.querySelector('#setting-button-save-downloadMode-audio') : document.querySelector('#setting-button-save-downloadMode-auto');
-          const loadingIcon = document.querySelector('#input-icons');
-          if (!input || !button || !loadingIcon) {
-            retry();
-          } else {
-            GM_deleteValue('cobaltUrl');
-            GM_deleteValue('cobaltUrlAudioOnly');
-            yddAdded = true;
-            setInput(input, url);
-            button.click();
-            const observer = new MutationObserver(function () {
-              if (loadingIcon.classList.contains('loading') || !loadingIcon) return;
-              const dwnButton = document.querySelector('#download-button');
-              dwnButton.click();
-              observer.disconnect();
-            });
-            observer.observe(loadingIcon, { attributes: true, attributeFilter: ['class'] });
-          }
-        }
-        return true;
-      }
-      return false;
-    case 'yt5s':
-      if (document.location.href.indexOf('yt5s.biz') > -1) {
-        const url = GM_getValue('yt5sUrl');
-        if (url) {
-          const input = document.querySelector('#txt-url');
-          const button = document.querySelector('#btn-submit');
-          if (!input || !button) {
-            retry();
-          } else {
-            GM_deleteValue('yt5sUrl');
-            yddAdded = true;
-            setInput(input, url);
-            button.click();
-          }
-        }
-        return true;
-      } else if (document.location.href.indexOf('5smp3.com') > -1) {
-        const url = GM_getValue('yt5sUrl');
-        if (url) {
-          const input = document.querySelector('#inputUrl');
-          const button = document.querySelector('.btn-icon.rounded-pill');
-          if (!input || !button) {
-            retry();
-          } else {
-            GM_deleteValue('yt5sUrl');
-            yddAdded = true;
-            input.value = url;
-            button.click();
-          }
-        }
-        return true;
-      }
-      return false;
-    case 'yt1s':
-      if (document.location.href.indexOf('yt1s.biz') > -1) {
-        const url = GM_getValue('yt1sUrl');
-        if (url) {
-          const input = document.querySelector('.index-module--search--fb2ee');
-          if (!input) {
-            retry();
-          } else {
-            GM_deleteValue('yt1sUrl');
-            yddAdded = true;
-            setInput(input, url);
-          }
-        }
-        return true;
-      }
-    case 'ytmp3':
-      if (document.location.href.indexOf('ytmp3') > -1) {
-        const url = GM_getValue('ytmp3Url');
-        const audioOnly = GM_getValue('ytmp3AudioOnly');
-        if (url) {
-          const input = document.querySelector('input[id="v"]');
-          const button = document.querySelector("button[type='submit']");
-          if (!input || !button) {
-            retry();
-          } else {
-            GM_deleteValue('ytmp3Url');
-            GM_deleteValue('ytmp3AudioOnly');
-            yddAdded = true;
-            setInput(input, url);
-            // Swaps radio button for audio format
-            document.querySelectorAll('button:not(#submit)')[audioOnly ? 0 : 1].id = 'selected';
-            document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].id = '';
-
-            button.click();
-          }
-        }
-        return true;
-      }
-    default:
-      return false;
+  const serviceName = alternative ? gmc.get('backupService') : gmc.get('downloadService');
+  const service = downloadServices[serviceName];
+  if (service && service.checkPage) {
+    return service.checkPage();
   }
+  return false;
 }
 
 function modify() {
