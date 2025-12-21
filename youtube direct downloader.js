@@ -346,7 +346,7 @@ const defaults = {
   showCobaltError: false,
 };
 
-const donwloadServices = {
+const downloadServices = {
   yt5s: {
     title: 'YT5S',
     download: (isAudioOnly) => {
@@ -575,13 +575,13 @@ let gmc = new GM_config({
       labelPos: 'left',
       type: 'select',
       default: defaults.downloadService,
-      options: Object.keys(donwloadServices),
+      options: Object.keys(downloadServices),
     },
     backupService: {
       label: 'Backup service:',
       type: 'select',
       default: defaults.backupService,
-      options: [...Object.keys(donwloadServices), 'none'],
+      options: [...Object.keys(downloadServices), 'none'],
     },
     quality: {
       section: ['Cobalt API settings'],
@@ -634,7 +634,7 @@ let gmc = new GM_config({
     },
     url: {
       section: ['Links'],
-      label: 'Github script page',
+      label: 'YDD github page',
       type: 'button',
       click: () => {
         GM_openInTab('https://github.com/FawayTT/userscripts');
@@ -721,8 +721,8 @@ function handleCobaltError(errorMessage, isAudioOnly) {
 function download(isAudioOnly, downloadService) {
   if (!downloadService) downloadService = gmc.get('downloadService');
   console.log('Attempting download with ' + downloadService);
-  if (donwloadServices[downloadService]) {
-    donwloadServices[downloadService].download(isAudioOnly);
+  if (downloadServices[downloadService]) {
+    downloadServices[downloadService].download(isAudioOnly);
   } else {
     console.error('Download service not found: ' + downloadService);
   }
@@ -806,8 +806,8 @@ function createButton(bar, short) {
   } else bar.appendChild(div);
 
   let downloadService = gmc.get('downloadService') || defaults.downloadService;
-  if (donwloadServices[downloadService] && donwloadServices[downloadService].title) {
-    button.title = donwloadServices[downloadService].title;
+  if (downloadServices[downloadService] && downloadServices[downloadService].title) {
+    button.title = downloadServices[downloadService].title;
   } else {
     button.title = 'YDD';
   }
@@ -847,7 +847,7 @@ function retry() {
 
 function checkPage(alternative) {
   const serviceName = alternative ? gmc.get('backupService') : gmc.get('downloadService');
-  const service = donwloadServices[serviceName];
+  const service = downloadServices[serviceName];
   if (service && service.checkPage) {
     return service.checkPage();
   }
