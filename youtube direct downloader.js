@@ -400,17 +400,14 @@ const downloadServices = {
             document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].id = '';
 
             convertButton.click();
-            console.log("Clicked Convert!");
 
             const ytmp3Observer = new MutationObserver( function () {
               const finishedConversion = document.querySelector('div[style="justify-content: center;"');
               if (finishedConversion) {
-                console.log("conversion finished, clicking download");
                 finishedConversion.querySelector('button').click();
               }
             });
 
-            console.log("Saw convert button was clicked, waiting for conversion to complete");
             ytmp3Observer.observe(document.body, {
             childList: true,
             subtree: true,});
