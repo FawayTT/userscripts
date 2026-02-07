@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             5.1
+// @version             5.2
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, yt5s, yt1s, ytmp3) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
