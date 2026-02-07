@@ -387,8 +387,8 @@ const downloadServices = {
         const audioOnly = GM_getValue('ytmp3AudioOnly');
         if (url) {
           const input = document.querySelector('input[id="v"]');
-          const button = document.querySelector("button[type='submit']");
-          if (!input || !button) {
+          const convertButton = document.querySelector("button[type='submit']");
+          if (!input || !convertButton) {
             retry();
           } else {
             GM_deleteValue('ytmp3Url');
@@ -399,7 +399,18 @@ const downloadServices = {
             document.querySelectorAll('button:not(#submit)')[audioOnly ? 0 : 1].id = 'selected';
             document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].id = '';
 
-            button.click();
+            convertButton.click();
+
+            const ytmp3Observer = new MutationObserver( function () {
+              const finishedConversion = document.querySelector('div[style="justify-content: center;"');
+              if (finishedConversion) {
+                finishedConversion.querySelector('button').click();
+              }
+            });
+
+            ytmp3Observer.observe(document.body, {
+            childList: true,
+            subtree: true,});
           }
         }
         return true;
