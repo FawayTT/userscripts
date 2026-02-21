@@ -905,7 +905,7 @@ function modify() {
     });
     yddAdded = true;
   } else {
-    const bar = document.getElementById('owner');
+    const bar = document.getElementById('owner') || document.querySelector('div.slim-owner-subscribe-button');
     if (!bar) {
       yddAdded = false;
       return;
