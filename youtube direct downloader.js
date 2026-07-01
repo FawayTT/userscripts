@@ -11,8 +11,8 @@
 // @match               *://*.cobalt.meowing.de/*
 // @match               *://*.5smp3.com/*
 // @match               *://*.yt1s.biz/*
-// @match               *://*.ytmp3.*/*
-// @match               *://*.yt2mp3.*/*
+// @match               *://*.ytmp3.tld/*
+// @match               *://*.yt2mp3.tld/*
 // @connect             cobalt-api.kwiatekmiki.com
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
@@ -396,18 +396,23 @@ const downloadServices = {
             GM_deleteValue('ytmp3AudioOnly');
             yddAdded = true;
             setInput(input, url);
+
             // Swaps radio button for audio format
-            document.querySelectorAll('button:not(#submit)')[audioOnly ? 0 : 1].id = 'selected';
-            document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].id = '';
+            const formatButton = [...document.querySelectorAll('button')].find((btn) => btn.textContent.includes(audioOnly ? 'MP3' : 'MP4'));
+
+            if (formatButton) {
+              formatButton.click();
+            }
 
             convertButton.click();
 
             const ytmp3Observer = new MutationObserver(function () {
-              const finishedConversion = document.querySelector('div[style="justify-content: center;"');
-              if (finishedConversion) {
-                finishedConversion.querySelector('button').click();
-                ytmp3Observer.disconnect();
-              }
+              const finishedConverting = [...document.querySelectorAll('div')].some((el) => el.textContent.includes('completed'));
+              if (!finishedConverting) return;
+              const downloadButton = [...document.querySelectorAll('button')].find((btn) => btn.textContent.includes('Download'));
+              if (!downloadButton) return;
+              downloadButton.click();
+              ytmp3Observer.disconnect();
             });
 
             ytmp3Observer.observe(document.body, {
