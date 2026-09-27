@@ -24,8 +24,6 @@
 // @grant               GM_xmlhttpRequest
 // @license             MIT
 // @run-at              document-end
-// @downloadURL https://update.greasyfork.org/scripts/481954/YouTube%20Direct%20Downloader.user.js
-// @updateURL https://update.greasyfork.org/scripts/481954/YouTube%20Direct%20Downloader.meta.js
 // ==/UserScript==
 
 const gmcCSS = `
@@ -410,20 +408,12 @@ const downloadServices = {
             convertButton.click();
 
             const ytmp3Observer = new MutationObserver(function () {
-
-              var finishedConverting = false;
-              [...document.querySelectorAll('div')].filter(
-                a => a.textContent.includes("completed")).forEach(
-                a => {
-                  console.log(a);
-                  finishedConverting = true;
-                });
-
-              if (finishedConverting)
-              {
-                [...document.querySelectorAll('button')].filter(a => a.textContent.includes("Download"))[0].click();
-                ytmp3Observer.disconnect();
-              }
+              const finishedConverting = [...document.querySelectorAll('div')].some((el) => el.textContent.includes('completed'));
+              if (!finishedConverting) return;
+              const downloadButton = [...document.querySelectorAll('button')].find((btn) => btn.textContent.includes('Download'));
+              if (!downloadButton) return;
+              downloadButton.click();
+              ytmp3Observer.disconnect();
             });
 
             ytmp3Observer.observe(document.body, {
