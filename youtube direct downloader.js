@@ -13,6 +13,7 @@
 // @match               *://*.yt1s.biz/*
 // @match               *://*.ytmp3.tld/*
 // @match               *://*.yt2mp3.tld/*
+// @include             /^[^:]*?://[^/]*?ytmp3[^/]*?/.*?$/
 // @connect             cobalt-api.kwiatekmiki.com
 // @require             https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant               GM_getValue
@@ -388,11 +389,13 @@ const downloadServices = {
       if (checkUrl('ytmp3') || checkUrl('yt2mp3')) {
         const url = GM_getValue('ytmp3Url');
         const audioOnly = GM_getValue('ytmp3AudioOnly');
-        console.log("Audio only:" + audioOnly)
+        console.log("Audio only:" + audioOnly);
         if (url) {
-          const input = document.querySelector('input[id="v"]') || document.querySelector('input[id="video"]');
+          console.log("Converting " + url);
+          const input = document.querySelector('input[id="link"]') || document.querySelector('input[id="video"]') || document.querySelector('input[id="v"]');
           const convertButton = document.querySelector("button[type='submit']");
           if (!input || !convertButton) {
+            console.log("Didn't find either text box or button!");
             retry();
           } else {
             GM_deleteValue('ytmp3Url');
@@ -400,9 +403,6 @@ const downloadServices = {
             yddAdded = true;
             setInput(input, url);
 
-            // Swaps radio button for audio format
-            //document.querySelectorAll('button:not(#submit)')[audioOnly ? 1 : 0].class = 'selected';
-            //document.querySelectorAll('button:not(#submit)')[audioOnly ? 0 : 1].class = '';
             [...document.querySelectorAll('button')].filter(
               a => a.textContent.includes(audioOnly ? "MP3" : "MP4")).forEach(
               a => {a.click();});
