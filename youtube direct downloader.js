@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name                YouTube Direct Downloader
-// @version             5.5
+// @version             5.6
 // @description         Video/short download button next to subscribe button. Downloads MP4, WEBM, MP3 or subtitles from youtube + option to redirect shorts to normal videos. Choose your preferred quality from 8k to audio only, codec (h264, vp9 or av1) or service provider (cobalt, yt5s, yt1s, ytmp3) in settings.
 // @author              FawayTT
 // @namespace           FawayTT
@@ -387,9 +387,9 @@ const downloadServices = {
       if (checkUrl('ytmp3') || checkUrl('yt2mp3')) {
         const url = GM_getValue('ytmp3Url');
         const audioOnly = GM_getValue('ytmp3AudioOnly');
-        console.log("Audio only:" + audioOnly);
+        console.log('Audio only:' + audioOnly);
         if (url) {
-          console.log("Converting " + url);
+          console.log('Converting ' + url);
           const input = document.querySelector('input[id="link"]') || document.querySelector('input[id="video"]') || document.querySelector('input[id="v"]');
           const convertButton = document.querySelector("button[type='submit']");
           if (!input || !convertButton) {
@@ -401,9 +401,11 @@ const downloadServices = {
             yddAdded = true;
             setInput(input, url);
 
-            [...document.querySelectorAll('button')].filter(
-              a => a.textContent.includes(audioOnly ? "MP3" : "MP4")).forEach(
-              a => {a.click();});
+            [...document.querySelectorAll('button')]
+              .filter((a) => a.textContent.includes(audioOnly ? 'MP3' : 'MP4'))
+              .forEach((a) => {
+                a.click();
+              });
 
             convertButton.click();
 
@@ -844,10 +846,15 @@ function createButton(bar, short) {
   div.appendChild(button);
   div.appendChild(options);
   if (short) {
-    div.style.marginTop = '10px';
-    div.style.marginLeft = '0px';
-    bar.insertBefore(div, bar.firstChild);
-  } else bar.appendChild(div);
+    div.style.position = 'absolute';
+    div.style.top = '50%';
+    div.style.color = 'white';
+    div.style.right = '0px';
+    div.style.zIndex = '9999';
+    div.style.marginTop = '80px';
+    div.style.marginRight = '25px';
+  }
+  bar.appendChild(div);
 
   let downloadService = gmc.get('downloadService') || defaults.downloadService;
   if (downloadServices[downloadService] && downloadServices[downloadService].title) {
@@ -906,27 +913,17 @@ function modify() {
     yddAdded = true;
     return;
   }
-  if (short) {
-    const bars = document.querySelectorAll('#actions');
-    if (bars.length <= 1) {
-      yddAdded = false;
-      return;
-    }
-    deleteButtons();
-    bars.forEach((bar) => {
-      createButton(bar, true);
-    });
-    yddAdded = true;
-  } else {
-    const bar = document.getElementById('owner') || document.querySelector('div.slim-owner-subscribe-button');
-    if (!bar) {
-      yddAdded = false;
-      return;
-    }
-    deleteButtons();
-    createButton(bar, false);
-    yddAdded = true;
+
+  const bar = short
+    ? document.getElementById('shorts-container') || document.querySelector('div.video-wrapper')
+    : document.getElementById('owner') || document.querySelector('div.slim-owner-subscribe-button');
+  if (!bar) {
+    yddAdded = false;
+    return;
   }
+  deleteButtons();
+  createButton(bar, short);
+  yddAdded = true;
 }
 
 function onInit() {
